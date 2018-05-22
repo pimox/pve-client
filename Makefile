@@ -28,9 +28,9 @@ pve-api-definition.js:
 	./extractapi.pl > pve-api-definition.js.tmp
 	mv pve-api-definition.js.tmp pve-api-definition.js
 
-.PHONY: upload
-upload: ${DEB}
-	tar cf - ${DEB} | ssh -X repoman@repo.proxmox.com upload --product pmg,pve --dist stretch
+#.PHONY: upload
+#upload: ${DEB}
+#	tar cf - ${DEB} | ssh -X repoman@repo.proxmox.com upload --product pmg,pve --dist stretch
 
 distclean: clean
 
