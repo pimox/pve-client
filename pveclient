@@ -1,0 +1,70 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use lib '.';
+use Data::Dumper;
+
+use PVE::APIClient::LWP;
+use PVE::APIClient::Helpers;
+use JSON;
+
+sub print_usage {
+
+    die "Usage: implement me";
+    exit(-1);
+}
+
+sub call_method {
+    my ($path, $method, $args) = @_;
+
+    die "missing API path\n" if !defined($path);
+
+    my $info = PVE::APIClient::Helpers::lookup_api_method($path, $method);
+    my $param = PVE::APIClient::Helpers::get_options($info->{parameters}, $args);
+    print Dumper($param);
+
+    die "implement me";
+}
+
+# NOTE: This binary is just a placeholer - nothing implemented so far!
+
+#my $hostname = 'localhost';
+#my $username = 'root@pam';
+#
+#my $conn = PVE::APIClient::LWP->new(
+#    username => $username,
+#    #password => 'yourpassword',
+#    #ticket => $ticket,
+#    #csrftoken => $csrftoken,
+#    host => $hostname,
+#    # allow manual fingerprint verification
+#    manual_verification => 1,
+#    );
+
+#my $res = $conn->get("/", {});
+#print to_json($res, { pretty => 1, canonical => 1});
+
+my $cmd = shift || print_usage();
+
+if ($cmd eq 'get') {
+    my $method = 'GET';
+    my $path;
+    if (scalar(@ARGV) && $ARGV[0] !~ m/^\-/)  {
+	$path = shift @ARGV;
+    }
+    my $res = call_method($path, $method, \@ARGV);
+    die "implement me";
+} elsif ($cmd eq 'set') {
+    die "implement me";
+} elsif ($cmd eq 'create') {
+    die "implement me";
+} elsif ($cmd eq 'delete') {
+    die "implement me";
+} elsif ($cmd eq 'enter') {
+    die "implement me";
+} else {
+    print_usage();
+}
+
+die "implement me";
