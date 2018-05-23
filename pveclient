@@ -5,6 +5,7 @@ use warnings;
 use lib '/usr/share/pve-client';
 use Data::Dumper;
 
+use PVE::JSONSchema;
 use PVE::CLIHandler;
 
 use PVE::APIClient::LWP;
@@ -25,7 +26,7 @@ sub call_method {
     die "missing API path\n" if !defined($path);
 
     my $info = PVE::APIClient::Helpers::lookup_api_method($path, $method);
-    my $param = PVE::APIClient::Helpers::get_options($info->{parameters}, $args);
+    my $param = PVE::JSONSchema::get_options($info->{parameters}, $args);
     print Dumper($param);
 
     die "implement me";
