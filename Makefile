@@ -31,6 +31,7 @@ install:  pve-api-definition.js
 	# install pveclient
 	install -D -m 0644 PVE/APIClient/Helpers.pm ${LIB_DIR}/PVE/APIClient/Helpers.pm
 	install -D -m 0644 PVE/APIClient/Commands/remote.pm ${LIB_DIR}/PVE/APIClient/Commands/remote.pm
+	install -D -m 0644 PVE/APIClient/Commands/lxc.pm ${LIB_DIR}/PVE/APIClient/Commands/lxc.pm
 	install -D -m 0644 pve-api-definition.js ${LIB_DIR}/pve-api-definition.js
 	install -D -m 0755 pveclient ${DESTDIR}/usr/bin/pveclient
 

@@ -12,6 +12,7 @@ use PVE::CLIHandler;
 use PVE::APIClient::LWP;
 use PVE::APIClient::Helpers;
 use PVE::APIClient::Commands::remote;
+use PVE::APIClient::Commands::lxc;
 
 use JSON;
 
@@ -20,6 +21,8 @@ sub print_usage {
     my $text = "pveclient usage:\n\n";
 
     $text .= "pveclient remote <help|add|remove> {options}\n\n";
+
+    $text .= "pveclient lxc <help|create|destroy|...> {options}\n\n";
 
     $text .= "pveclient <get/set/create/delete> <path> {options}\n\n";
 
@@ -73,6 +76,8 @@ if ($cmd eq 'get') {
     die "implement me";
 } elsif ($cmd eq 'delete') {
     die "implement me";
+} elsif ($cmd eq 'lxc') {
+    PVE::APIClient::Commands::lxc->run_cli_handler();
 } elsif ($cmd eq 'remote') {
     PVE::APIClient::Commands::remote->run_cli_handler();
 } else {
