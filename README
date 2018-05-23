@@ -1,1 +1,11 @@
 Experimental PVE Client
+
+
+The following files are copied from our pve-common package:
+
+PVE/CLIHandler.pm: removed PVE::Inotify use.
+PVE/Exception.pm
+PVE/JSONSchema.pm
+PVE/RESTHandler.pm
+PVE/SafeSyslog.pm
+PVE/Tools.pm: only selected/required helpers

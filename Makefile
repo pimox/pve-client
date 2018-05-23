@@ -6,7 +6,7 @@ DEB=${PACKAGE}_${PKGVER}-${PKGREL}_all.deb
 
 DESTDIR=
 
-PERL5DIR=${DESTDIR}/usr/share/perl5
+LIB_DIR=${DESTDIR}/usr/share/${PACKAGE}
 DOCDIR=${DESTDIR}/usr/share/doc/${PACKAGE}
 
 all: ${DEB}
@@ -20,8 +20,18 @@ deb ${DEB}:
 	lintian ${DEB}
 
 install:  pve-api-definition.js
-	install -D -m 0644 PVE/APIClient/Helpers.pm ${PERL5DIR}/PVE/APIClient/Helpers.pm
-	install -D -m 0644 pve-api-definition.js ${DESTDIR}/usr/share/${PACKAGE}/pve-api-definition.js
+	install -d -m 0755 ${LIB_DIR}/PVE
+	# install library tools from pve-common
+	install -m 0644 PVE/Tools.pm ${LIB_DIR}/PVE
+	install -m 0644 PVE/SafeSyslog.pm ${LIB_DIR}/PVE
+	install -m 0644 PVE/Exception.pm ${LIB_DIR}/PVE
+	install -m 0644 PVE/JSONSchema.pm ${LIB_DIR}/PVE
+	install -m 0644 PVE/RESTHandler.pm  ${LIB_DIR}/PVE
+	install -m 0644 PVE/CLIHandler.pm ${LIB_DIR}/PVE
+	# install pveclient
+	install -D -m 0644 PVE/APIClient/Helpers.pm ${LIB_DIR}/PVE/APIClient/Helpers.pm
+	install -D -m 0644 PVE/APIClient/Commands/remote.pm ${LIB_DIR}/PVE/APIClient/Commands/remote.pm
+	install -D -m 0644 pve-api-definition.js ${LIB_DIR}/pve-api-definition.js
 	install -D -m 0755 pveclient ${DESTDIR}/usr/bin/pveclient
 
 pve-api-definition.js:

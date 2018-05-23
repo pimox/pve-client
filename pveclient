@@ -2,11 +2,15 @@
 
 use strict;
 use warnings;
-use lib '.';
+use lib '/usr/share/pve-client';
 use Data::Dumper;
+
+use PVE::CLIHandler;
 
 use PVE::APIClient::LWP;
 use PVE::APIClient::Helpers;
+use PVE::APIClient::Commands::remote;
+
 use JSON;
 
 sub print_usage {
@@ -61,10 +65,10 @@ if ($cmd eq 'get') {
     die "implement me";
 } elsif ($cmd eq 'delete') {
     die "implement me";
-} elsif ($cmd eq 'enter') {
-    die "implement me";
+} elsif ($cmd eq 'remote') {
+    PVE::APIClient::Commands::remote->run_cli_handler();
 } else {
     print_usage();
 }
 
-die "implement me";
+exit(0);
