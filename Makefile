@@ -35,7 +35,7 @@ install:  pve-api-definition.js
 	install -D -m 0644 PVE/APIClient/Commands/lxc.pm ${LIB_DIR}/PVE/APIClient/Commands/lxc.pm
 	install -D -m 0644 pve-api-definition.js ${LIB_DIR}/pve-api-definition.js
 	install -D -m 0755 pveclient ${DESTDIR}/usr/bin/pveclient
-	install -D -m 0644 pveclient.bash-completion ${BASHCOMPLDIR}/pveclient.bash-completion
+	install -D -m 0644 pveclient.bash-completion ${BASHCOMPLDIR}/pveclient
 
 
 pve-api-definition.js:
