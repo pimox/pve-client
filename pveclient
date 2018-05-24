@@ -2,6 +2,7 @@
 
 use strict;
 use warnings;
+use Cwd 'abs_path';
 use lib '/usr/share/pve-client';
 use lib '.';
 use Data::Dumper;
@@ -113,6 +114,24 @@ if ($cmd eq 'get') {
 	}
     }
 
+} elsif ($cmd eq 'packagedepends') {
+    # experimental code to print required perl packages
+    my $packages = {};
+    my $dir = Cwd::getcwd;
+
+    foreach my $k (keys %INC) {
+	my $file = abs_path($INC{$k});
+	next if $file =~ m/^\Q$dir\E/;
+	my $res = `dpkg -S '$file'`;
+	if ($res && $res =~ m/^(\S+): $file$/) {
+	    my $debian_package = $1;
+	    $debian_package =~ s/:amd64$//;
+	    $packages->{$debian_package} = 1;
+	} else {
+	    die "unable to find package for '$file'\n";
+	}
+    }
+    print join("\n", sort(keys %$packages)) . "\n";
 } else {
     print_usage();
 }
