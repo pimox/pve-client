@@ -60,6 +60,11 @@ sub call_method {
 #my $res = $conn->get("/", {});
 #print to_json($res, { pretty => 1, canonical => 1});
 
+my $cli_class_handlers = {
+    lxc => 'PVE::APIClient::Commands::lxc',
+    remote => 'PVE::APIClient::Commands::remote',
+};
+
 my $cmd = shift || (print_usage() && exit(-1));
 
 if ($cmd eq 'get') {
@@ -76,22 +81,35 @@ if ($cmd eq 'get') {
     die "implement me";
 } elsif ($cmd eq 'delete') {
     die "implement me";
-} elsif ($cmd eq 'lxc') {
-    PVE::APIClient::Commands::lxc->run_cli_handler();
-} elsif ($cmd eq 'remote') {
-    PVE::APIClient::Commands::remote->run_cli_handler();
+} elsif (my $class = $cli_class_handlers->{$cmd}) {
+    $class->run_cli_handler();
 } elsif ($cmd eq 'bashcomplete') {
 
-    my $cmdline = substr($ENV{COMP_LINE}, 0, $ENV{COMP_POINT});
-    $cmdline =~ s/$cur$//;
+    exit(0) if !(defined($ENV{COMP_LINE}) && defined($ENV{COMP_POINT}));
 
-    my ($bash_command, $cur, $prev) = @ARGV;
+    my $cmdlist = join('|', keys %$cli_class_handlers);
+    if ($ENV{COMP_LINE} =~ m/^(.*pveclient\s+($cmdlist)\s+)(.*)$/) {
+	my $cmd = $2;
+	my $class = $cli_class_handlers->{$cmd} || die "internal error";
+	$ENV{COMP_LINE} = "pveclient $3";
+	$ENV{COMP_POINT} = length($ENV{COMP_LINE});
+	@ARGV = ('bashcomplete', 'pveclient', $ARGV[1], $ARGV[2]);
 
-    my $args = [split(/\s+/, $cmdline)];
+	$class->run_cli_handler();
 
-    if (scalar(@$args) == 1) {
-	foreach my $p (qw(get set create delete lxc remote)) {
-	    print "$p\n" if $p =~ m/^$cur/;
+    } else {
+
+	my $cmdline = substr($ENV{COMP_LINE}, 0, $ENV{COMP_POINT});
+	my ($bash_command, $cur, $prev) = @ARGV;
+	$cmdline =~ s/$cur$//;
+
+	my $args = PVE::Tools::split_args($cmdline);
+
+	my @cmds = ('get', 'set', 'create', 'delete', keys %$cli_class_handlers);
+	if (scalar(@$args) == 1) {
+	    foreach my $p (@cmds) {
+		print "$p\n" if $p =~ m/^$cur/;
+	    }
 	}
     }
 
