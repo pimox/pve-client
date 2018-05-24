@@ -80,6 +80,21 @@ if ($cmd eq 'get') {
     PVE::APIClient::Commands::lxc->run_cli_handler();
 } elsif ($cmd eq 'remote') {
     PVE::APIClient::Commands::remote->run_cli_handler();
+} elsif ($cmd eq 'bashcomplete') {
+
+    my $cmdline = substr($ENV{COMP_LINE}, 0, $ENV{COMP_POINT});
+    $cmdline =~ s/$cur$//;
+
+    my ($bash_command, $cur, $prev) = @ARGV;
+
+    my $args = [split(/\s+/, $cmdline)];
+
+    if (scalar(@$args) == 1) {
+	foreach my $p (qw(get set create delete lxc remote)) {
+	    print "$p\n" if $p =~ m/^$cur/;
+	}
+    }
+
 } else {
     print_usage();
 }

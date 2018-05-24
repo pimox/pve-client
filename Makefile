@@ -8,6 +8,7 @@ DESTDIR=
 
 LIB_DIR=${DESTDIR}/usr/share/${PACKAGE}
 DOCDIR=${DESTDIR}/usr/share/doc/${PACKAGE}
+BASHCOMPLDIR=${DESTDIR}/usr/share/bash-completion/completions/
 
 all: ${DEB}
 
@@ -34,6 +35,8 @@ install:  pve-api-definition.js
 	install -D -m 0644 PVE/APIClient/Commands/lxc.pm ${LIB_DIR}/PVE/APIClient/Commands/lxc.pm
 	install -D -m 0644 pve-api-definition.js ${LIB_DIR}/pve-api-definition.js
 	install -D -m 0755 pveclient ${DESTDIR}/usr/bin/pveclient
+	install -D -m 0644 pveclient.bash-completion ${BASHCOMPLDIR}/pveclient.bash-completion
+
 
 pve-api-definition.js:
 	./extractapi.pl > pve-api-definition.js.tmp
