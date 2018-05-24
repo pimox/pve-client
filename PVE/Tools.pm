@@ -6,6 +6,7 @@ use POSIX qw(EINTR EEXIST EOPNOTSUPP);
 use base 'Exporter';
 
 use IO::File;
+use Text::ParseWords;
 
 our @EXPORT_OK = qw(
 $IPV6RE
@@ -124,6 +125,13 @@ sub split_list {
     my @data = split (/\s+/, $listtxt);
 
     return @data;
+}
+
+# split an shell argument string into an array,
+sub split_args {
+    my ($str) = @_;
+
+    return $str ? [ Text::ParseWords::shellwords($str) ] : [];
 }
 
 1;
