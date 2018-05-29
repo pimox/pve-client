@@ -2,31 +2,18 @@ package PVE::APIClient::Commands::lxc;
 
 use strict;
 use warnings;
-use JSON;
-use File::HomeDir;
 
 use PVE::Tools;
+use PVE::JSONSchema qw(get_standard_option);
 use PVE::CLIHandler;
 
 use base qw(PVE::CLIHandler);
-
-my $load_config = sub {
-
-    my $filename = home() . '/.pveclient';
-    my $conf_str = PVE::Tools::file_get_contents($filename);
-
-    my $filemode = (stat($filename))[2] & 07777;
-    if ($filemode != 0600) {
-	die sprintf "wrong permissions on '$filename' %04o (expected 0600)\n", $filemode;
-    }
-
-    return decode_json($conf_str);
-};
+use PVE::APIClient::Config;
 
 my $load_remote_config = sub {
     my ($remote) = @_;
 
-    my $conf = $load_config->();
+    my $conf = PVE::APIClient::Config::load_config();
 
     my $remote_conf = $conf->{"remote_$remote"} ||
 	die "no such remote '$remote'\n";
@@ -52,7 +39,6 @@ my $get_remote_connection = sub {
 	});
 };
 
-
 __PACKAGE__->register_method ({
     name => 'enter',
     path => 'enter',
@@ -61,10 +47,7 @@ __PACKAGE__->register_method ({
     parameters => {
 	additionalProperties => 0,
 	properties => {
-	    remote => {
-		description => "The name of the remote.",
-		type => 'string',
-	    },
+	    remote => get_standard_option('pveclient-remote-name'),
 	    vmid => {
 		description => "The container ID",
 		type => 'string',
@@ -95,10 +78,7 @@ __PACKAGE__->register_method ({
     parameters => {
 	additionalProperties => 0,
 	properties => {
-	    remote => {
-		description => "The remote name.",
-		type => 'string',
-	    },
+	    remote => get_standard_option('pveclient-remote-name'),
 	},
     },
     returns => { type => 'null'},
