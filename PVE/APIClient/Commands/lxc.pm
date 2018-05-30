@@ -44,7 +44,6 @@ my $build_web_socket_request = sub {
     return ($request, $enckey);
 };
 
-# FIXME: share this code with websockt code in PVE/APIServer/AnyEvent.pm ?
 my $create_websockt_frame = sub {
     my ($payload) = @_;
 
@@ -66,9 +65,8 @@ my $create_websockt_frame = sub {
     return $string;
 };
 
-# FIXME: share this code with websockt code in PVE/APIServer/AnyEvent.pm ?
 my $parse_web_socket_frame = sub  {
-    my ($wsbuf_ref, $binary, $is_server) = @_;
+    my ($wsbuf_ref) = @_;
 
     my $wsbuf = $$wsbuf_ref;
 
@@ -90,11 +88,7 @@ my $parse_web_socket_frame = sub  {
 	my $payload_len = unpack 'C', substr($wsbuf, 1, 1);
 
 	my $masked = $payload_len & 0b10000000;
-	if ($is_server) {
-	    die "received unmasked websocket frame from client\n" if !$masked;
-	} else {
-	    die "received masked websocket frame from server\n" if $masked;
-	}
+	die "received masked websocket frame from server\n" if $masked;
 
 	my $offset = 2;
 	$payload_len = $payload_len & 0b01111111;
@@ -111,33 +105,11 @@ my $parse_web_socket_frame = sub  {
 	die "received too large websocket frame (len = $payload_len)\n"
 	    if ($payload_len > $max_payload_size) || ($payload_len < 0);
 
-	my @mask = (0, 0, 0, 0);
-	if ($masked) {
-	    last if $len < $offset + 4;
-
-	    @mask = (unpack('C', substr($wsbuf, $offset+0, 1)),
-		     unpack('C', substr($wsbuf, $offset+1, 1)),
-		     unpack('C', substr($wsbuf, $offset+2, 1)),
-		     unpack('C', substr($wsbuf, $offset+3, 1)));
-
-	    $offset += 4;
-	}
-
 	last if $len < ($offset + $payload_len);
 
 	my $data = substr($wsbuf, 0, $offset + $payload_len, ''); # now consume data
 
 	my $frame_data = substr($data, $offset, $payload_len);
-
-	if ($masked) {
-	    for (my $i = 0; $i < $payload_len; $i++) {
-		my $d = unpack('C', substr($frame_data, $i, 1));
-		my $n = $d ^ $mask[$i % 4];
-		substr($frame_data, $i, 1, pack('C', $n));
-	    }
-	}
-
-	$frame_data = decode_base64($frame_data) if !$binary;
 
 	$payload = '' if !defined($payload);
 	$payload .= $frame_data;
@@ -249,7 +221,7 @@ __PACKAGE__->register_method ({
 	    foreach my $fh (@ready) {
 		if ($fh == $web_socket) {
 		    my $nr = $wb_socket_read_available_bytes->();
-		    my ($payload, $req_close) = $parse_web_socket_frame->(\$wsbuf, 1);
+		    my ($payload, $req_close) = $parse_web_socket_frame->(\$wsbuf);
 		    print "GOT: $payload\n" if defined($payload);
 		    last if $req_close;
 		    last if !$nr; # eos
