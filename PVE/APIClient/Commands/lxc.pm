@@ -8,6 +8,7 @@ use IO::Select;
 use IO::Socket::SSL;
 use MIME::Base64;
 use Digest::SHA;
+use HTTP::Response;
 
 use PVE::Tools;
 use PVE::JSONSchema qw(get_standard_option);
