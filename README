@@ -9,3 +9,4 @@ PVE/JSONSchema.pm
 PVE/RESTHandler.pm
 PVE/SafeSyslog.pm
 PVE/Tools.pm: only selected/required helpers
+PVE/PTY.pm

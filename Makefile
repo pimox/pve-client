@@ -29,6 +29,7 @@ install:  pve-api-definition.js
 	install -m 0644 PVE/JSONSchema.pm ${LIB_DIR}/PVE
 	install -m 0644 PVE/RESTHandler.pm  ${LIB_DIR}/PVE
 	install -m 0644 PVE/CLIHandler.pm ${LIB_DIR}/PVE
+	install -m 0644 PVE/PTY.pm ${LIB_DIR}/PVE
 	# install pveclient
 	install -D -m 0644 PVE/APIClient/Helpers.pm ${LIB_DIR}/PVE/APIClient/Helpers.pm
 	install -D -m 0644 PVE/APIClient/Config.pm ${LIB_DIR}/PVE/APIClient/Config.pm
