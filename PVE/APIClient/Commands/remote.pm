@@ -31,6 +31,29 @@ sub read_password {
 }
 
 __PACKAGE__->register_method ({
+    name => 'list',
+    path => 'list',
+    method => 'GET',
+    description => "List remotes from your config file.",
+    parameters => {
+	additionalProperties => 0,
+    },
+    returns => { type => 'null' },
+    code => sub {
+	my $config = PVE::APIClient::Config->new();
+	my $known_remotes = $config->remote_names;
+
+	printf("%10s %10s %10s %10s %100s\n", "Name", "Host", "Port", "Username", "Fingerprint");
+	for my $name (@$known_remotes) {
+	    my $remote = $config->lookup_remote($name);
+	    printf("%10s %10s %10s %10s %100s\n", $name, $remote->{'host'},
+		$remote->{'port'}, $remote->{'username'}, $remote->{'fingerprint'});
+	}
+
+	return undef;
+    }});
+
+__PACKAGE__->register_method ({
     name => 'add',
     path => 'add',
     method => 'POST',
@@ -114,6 +137,7 @@ __PACKAGE__->register_method ({
 our $cmddef = {
     add => [ __PACKAGE__, 'add', ['name', 'host', 'username']],
     remove => [ __PACKAGE__, 'remove', ['name']],
+    list => [__PACKAGE__, 'list'],
 };
 
 1;
