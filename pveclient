@@ -14,22 +14,9 @@ use PVE::APIClient::LWP;
 use PVE::APIClient::Helpers;
 use PVE::APIClient::Commands::remote;
 use PVE::APIClient::Commands::lxc;
+use PVE::APIClient::Commands::help;
 
 use JSON;
-
-sub print_usage {
-
-    my $text = "pveclient usage:\n\n";
-
-    $text .= "pveclient remote <help|add|remove> {options}\n\n";
-
-    $text .= "pveclient lxc <help|create|destroy|...> {options}\n\n";
-
-    $text .= "pveclient <get/set/create/delete> <path> {options}\n\n";
-
-    print STDERR $text;
-
-}
 
 sub call_method {
     my ($path, $method, $args) = @_;
@@ -64,9 +51,14 @@ sub call_method {
 my $cli_class_handlers = {
     lxc => 'PVE::APIClient::Commands::lxc',
     remote => 'PVE::APIClient::Commands::remote',
+    help => 'PVE::APIClient::Commands::help',
 };
 
-my $cmd = shift || (print_usage() && exit(-1));
+my $cmd = shift;
+if (!defined($cmd)) {
+    PVE::APIClient::Commands::help->help({});
+    exit(-1);
+}
 
 if ($cmd eq 'get') {
     my $method = 'GET';
@@ -133,7 +125,7 @@ if ($cmd eq 'get') {
     }
     print join("\n", sort(keys %$packages)) . "\n";
 } else {
-    print_usage();
+    PVE::APIClient::Commands::help->help({});
 }
 
 exit(0);
