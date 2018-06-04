@@ -130,8 +130,11 @@ __PACKAGE__->register_method ({
     code => sub {
 	my ($param) = @_;
 
-	die "implement me";
+	my $config = PVE::APIClient::Config->new();
+	$config->remove_remote($param->{name});
+	$config->save;
 
+	return undef;
     }});
 
 our $cmddef = {
