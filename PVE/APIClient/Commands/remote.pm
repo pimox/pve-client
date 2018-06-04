@@ -10,27 +10,18 @@ use PVE::CLIHandler;
 
 use base qw(PVE::CLIHandler);
 
-my $remote_name_regex = qr(\w+);
-
 my $complete_remote_name = sub {
 
-    my $conf = PVE::APIClient::Config::load_config();
+    my $config = PVE::APIClient::Config->new();
+    my $known_remotes = $config->remotes;
 
-    my $res = [];
-
-    foreach my $k (keys %$conf) {
-	if ($k =~ m/^remote_($remote_name_regex)$/) {
-	    push @$res, $1;
-	}
-    }
-
-    return $res;
+    return [keys %{$known_remotes}];
 };
 
 register_standard_option('pveclient-remote-name', {
     description => "The name of the remote.",
     type => 'string',
-    pattern => $remote_name_regex,
+    pattern => qr([\w\d\.\-\_]+),
     completion => $complete_remote_name,
 });
 
