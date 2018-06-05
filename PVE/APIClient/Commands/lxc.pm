@@ -21,7 +21,7 @@ my $CRLF = "\x0D\x0A";
 my $max_payload_size = 65536;
 
 my $build_web_socket_request = sub {
-    my ($path, $ticket, $termproxy) = @_;
+    my ($host, $path, $ticket, $termproxy) = @_;
 
     my $key = '';
     $key .= chr(int(rand(256))) for 1 .. 16;
@@ -36,6 +36,7 @@ my $build_web_socket_request = sub {
     my $request = "GET $path HTTP/1.1$CRLF"
 	. "Upgrade: WebSocket$CRLF"
 	. "Connection: Upgrade$CRLF"
+	. "Host: $host$CRLF"
 	. "Sec-WebSocket-Key: $enckey$CRLF"
 	. "Sec-WebSocket-Version: 13$CRLF"
 	. "Sec-WebSocket-Protocol: binary$CRLF"
@@ -173,7 +174,7 @@ __PACKAGE__->register_method ({
 	# WebSocket Handshake
 
 	my ($request, $wskey) = $build_web_socket_request->(
-	    "/$api_path/vncwebsocket", $conn->{ticket}, $termproxy);
+	    $conn->{host}, "/$api_path/vncwebsocket", $conn->{ticket}, $termproxy);
 
 	$web_socket->syswrite($request);
 
@@ -205,8 +206,8 @@ __PACKAGE__->register_method ({
 
 	die "got invalid websocket reponse: $raw_response\n"
 	    if !(($response->code == 101) &&
-		 ($response->header('connection') eq 'upgrade') &&
-		 ($response->header('upgrade') eq 'websocket') &&
+		 (lc $response->header('connection') eq 'upgrade') &&
+		 (lc $response->header('upgrade') eq 'websocket') &&
 		 ($response->header('sec-websocket-protocol') eq 'binary') &&
 		 ($response->header('sec-websocket-accept') eq $wsaccept));
 
