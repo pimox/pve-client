@@ -6,12 +6,15 @@ use JSON;
 
 use File::HomeDir ();
 use PVE::JSONSchema qw(register_standard_option get_standard_option);
+use PVE::SectionConfig;
 use PVE::Tools qw(file_get_contents file_set_contents);
+
+use base qw(PVE::SectionConfig);
 
 my $complete_remote_name = sub {
 
-    my $config = PVE::APIClient::Config->new();
-    return $config->remote_names;
+    my $config = PVE::APIClient::Config->load();
+    return [keys %{$config->{ids}}];
 };
 
 register_standard_option('pveclient-remote-name', {
@@ -21,118 +24,117 @@ register_standard_option('pveclient-remote-name', {
     completion => $complete_remote_name,
 });
 
-sub new {
+
+my $defaultData = {
+    propertyList => {
+	type => {
+	    description => "Section type.",
+	    optional => 1,
+	},
+	name => get_standard_option('pveclient-remote-name'),
+	host => {
+	    description => "The host.",
+	    type => 'string', format => 'address',
+	    optional => 1,
+	},
+	username => {
+	    description => "The username.",
+	    type => 'string',
+	    optional => 1,
+	},
+	password => {
+	    description => "The users password.",
+	    type => 'string',
+	    optional => 1,
+	},
+	port => {
+	    description => "The port.",
+	    type => 'integer',
+	    optional => 1,
+	    default => 8006,
+	},
+	fingerprint => {
+	    description => "Fingerprint.",
+	    type => 'string',
+	    optional => 1,
+	},
+	comment => {
+	    description => "Description.",
+	    type => 'string',
+	    optional => 1,
+	    maxLength => 4096,
+	},
+    },
+};
+
+sub type {
+    return 'remote';
+}
+
+sub options {
+    return {
+	name => { optional => 0 },
+	host => { optional => 0 },
+	comment => { optional => 1 },
+	username => { optional => 0 },
+	password => { optional => 0 },
+	port => { optional => 1 },
+	fingerprint => { optional => 1 },
+   };
+}
+
+sub private {
+    return $defaultData;
+}
+
+sub config_filename {
     my ($class) = @_;
 
-    my $self = {
-	file         => File::HomeDir::home() . '/.pveclient',
-    };
-    bless $self => $class;
-
-    $self->load();
-
-    return $self;
+    return File::HomeDir::home() . '/.pveclient';
 }
 
 sub load {
-    my ($self) = @_;
+    my ($class) = @_;
 
-    if (-e $self->{file}) {
-	my $filemode = (stat($self->{file}))[2] & 07777;
+    my $filename = $class->config_filename();
+
+    my $raw = '';
+
+    if (-e $filename) {
+	my $filemode = (stat($filename))[2] & 07777;
 	if ($filemode != 0600) {
-	    die sprintf "wrong permissions on '$self->{file}' %04o (expected 0600)\n", $filemode;
+	    die sprintf "wrong permissions on '$filename' %04o (expected 0600)\n", $filemode;
 	}
 
-	my $contents = file_get_contents($self->{file});
-	$self->{data} = from_json($contents);
-    } else {
-	$self->{data} = {};
+	$raw = file_get_contents($filename);
     }
 
-    if (!exists($self->{data}->{remotes})) {
-	$self->{data}->{remotes} = {};
-    }
-
-    # Verify config
-    for my $name (@{$self->remote_names}) {
-	my $cfg = $self->{data}->{remotes}->{$name};
-
-	foreach my $opt (qw(host port username fingerprint)) {
-	  die "missing option '$opt' (remote '$name')" if !defined($cfg->{$opt});
-	}
-    }
+    return $class->parse_config($filename, $raw);
 }
 
 sub save {
-    my ($self) = @_;
+    my ($class, $cfg) = @_;
 
-    my $contents = to_json($self->{data}, {pretty => 1, canonical => 1});
-    file_set_contents($self->{file}, $contents, 0600);
-}
+    my $filename = $class->config_filename();
+    my $raw = $class->write_config($filename, $cfg);
 
-sub add_remote {
-    my ($self, $name, $host, $port, $fingerprint, $username, $password) = @_;
-
-    $self->{data}->{remotes}->{$name} = {
-	host => $host,
-	port => $port,
-	fingerprint => $fingerprint,
-	username => $username,
-    };
-
-    if (defined($password)) {
-	$self->{data}->{remotes}->{$name}->{password} = $password;
-    }
-}
-
-sub remote_names {
-    my ($self) = @_;
-
-    return [keys %{$self->{data}->{remotes}}];
+    file_set_contents($filename, $raw, 0600);
 }
 
 sub lookup_remote {
-    my ($self, $name) = @_;
+    my ($class, $cfg, $name, $noerr) = @_;
 
-    die "Unknown remote \"$name\" given"
-      if (!exists($self->{data}->{remotes}->{$name}));
+    my $data = $cfg->{ids}->{$name};
 
-    return $self->{data}->{remotes}->{$name};
-}
+    return $data if $noerr || defined($data);
 
-sub remotes {
-    my ($self) = @_;
-
-    my $res = {};
-
-    # Remove the password from each remote.
-    for my $name ($self->remote_names) {
-	my $cfg = $self->{data}->{remotes}->{$name};
-	$res->{$name} = {
-	    host        => $cfg->{host},
-	    port        => $cfg->{port},
-	    username    => $cfg->{username},
-	    fingerprint => $cfg->{fingerprint},
-	};
-    }
-
-    return $res;
-}
-
-sub remove_remote {
-    my ($self, $remote) = @_;
-
-    $self->lookup_remote($remote);
-
-    delete($self->{data}->{remotes}->{$remote});
-
-    $self->save();
+    die "unknown remote \"$name\"\n";
 }
 
 sub remote_conn {
-    my ($self, $remote) = @_;
+    my ($class, $cfg, $remote) = @_;
 
-    my $section = $self->lookup_remote($remote);
+    my $section = $class->lookup_remote($cfg, $remote);
     my $conn = PVE::APIClient::LWP->new(
 	username                => $section->{username},
 	password                => $section->{password},
@@ -147,5 +149,8 @@ sub remote_conn {
 
     return $conn;
 }
+
+__PACKAGE__->register();
+__PACKAGE__->init();
 
 1;

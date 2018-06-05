@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use PVE::JSONSchema qw(get_standard_option);
+use PVE::Tools qw(extract_param);
 use PVE::APIClient::Config;
 
 use PVE::CLIHandler;
@@ -27,14 +28,13 @@ __PACKAGE__->register_method ({
     },
     returns => { type => 'null' },
     code => sub {
-	my $config = PVE::APIClient::Config->new();
-	my $known_remotes = $config->remote_names;
+	my $config = PVE::APIClient::Config->load();
 
 	printf("%10s %10s %10s %10s %100s\n", "Name", "Host", "Port", "Username", "Fingerprint");
-	for my $name (@$known_remotes) {
-	    my $remote = $config->lookup_remote($name);
+	for my $name (keys %{$config->{ids}}) {
+	    my $remote = $config->{ids}->{$name};
 	    printf("%10s %10s %10s %10s %100s\n", $name, $remote->{'host'},
-		$remote->{'port'}, $remote->{'username'}, $remote->{'fingerprint'});
+		   $remote->{'port'} // '-', $remote->{'username'}, $remote->{'fingerprint'} // '-');
 	}
 
 	return undef;
@@ -45,48 +45,42 @@ __PACKAGE__->register_method ({
     path => 'add',
     method => 'POST',
     description => "Add a remote to your config file.",
-    parameters => {
-	additionalProperties => 0,
-	properties => {
-	    name => get_standard_option('pveclient-remote-name', { completion => sub {} }),
-	    host => {
-		description => "The host.",
-		type => 'string',
-		format => 'address',
-	    },
-	    username => {
-		description => "The username.",
-		type => 'string',
-	    },
-	    password => {
-		description => "The users password",
-		type => 'string',
-	    },
-	    port => {
-		description => "The port",
-		type => 'integer',
-		optional => 1,
-		default => 8006,
-	    }
-	},
-    },
+    parameters => PVE::APIClient::Config->createSchema(1),
     returns => { type => 'null'},
     code => sub {
 	my ($param) = @_;
 
-	my $config = PVE::APIClient::Config->new();
-	my $known_remotes = $config->remotes;
+	# fixme: lock config file
 
-	if (exists($known_remotes->{$param->{name}})) {
-	    die "Remote \"$param->{name}\" exists, remove it first\n";
-	}
+	my $remote = $param->{name};
+
+	my $config = PVE::APIClient::Config->load();
+
+	die "Remote '$remote' already exists\n"
+	    if $config->{ids}->{$remote};
 
 	my $last_fp = 0;
-	my $api = PVE::APIClient::LWP->new(
+
+	my $setup = {
 	    username                => $param->{username},
 	    password                => $param->{password},
 	    host                    => $param->{host},
 	    port                    => $param->{port} // 8006,
+	};
+
+	if ($param->{fingerprint}) {
+	    $setup->{cached_fingerprints} = {
+		$param->{fingerprint} => 1,
+	    };
+	} else {
+	    $setup->{manual_verification} = 1;
+	    $setup->{register_fingerprint_cb} = sub {
+		my $fp = shift @_;
+		$last_fp = $fp;
+	    };
+	}
+
+	my $api = PVE::APIClient::LWP->new(
 	    manual_verification     => 1,
 	    register_fingerprint_cb => sub {
 		my $fp = shift @_;
@@ -95,9 +89,56 @@ __PACKAGE__->register_method ({
 	);
 	$api->login();
 
-	$config->add_remote($param->{name}, $param->{host}, $param->{port} // 8006, 
-			    $last_fp, $param->{username}, $param->{password});
-	$config->save;
+	$param->{fingerprint} = $last_fp if !defined($param->{fingerprint});
+	my $plugin = PVE::APIClient::Config->lookup('remote');
+	my $opts = $plugin->check_config($remote, $param, 1, 1);
+	$config->{ids}->{$remote} = $opts;
+
+	PVE::APIClient::Config->save($config);
+
+	return undef;
+    }});
+
+__PACKAGE__->register_method ({
+    name => 'update',
+    path => 'update',
+    method => 'PUT',
+    description => "Update a remote configuration.",
+    parameters => PVE::APIClient::Config->updateSchema(1),
+    returns => { type => 'null'},
+    code => sub {
+	my ($param) = @_;
+
+	# fixme: lock config file
+
+	my $name = extract_param($param, 'name');
+	my $digest = extract_param($param, 'digest');
+	my $delete = extract_param($param, 'delete');
+
+	my $config = PVE::APIClient::Config->load();
+	my $remote = PVE::APIClient::Config->lookup_remote($config, $name);
+
+	my $plugin = PVE::APIClient::Config->lookup('remote');
+	my $opts = $plugin->check_config($name, $param, 0, 1);
+
+	foreach my $k (%$opts) {
+	    $remote->{$k} = $opts->{$k};
+	}
+
+	if ($delete) {
+	    my $options = $plugin->private()->{options}->{'remote'};
+	    foreach my $k (PVE::Tools::split_list($delete)) {
+		my $d = $options->{$k} ||
+		    die "no such option '$k'\n";
+		die "unable to delete required option '$k'\n"
+		    if !$d->{optional};
+		die "unable to delete fixed option '$k'\n"
+		    if $d->{fixed};
+		delete $remote->{$k};
+	    }
+	}
+
+	PVE::APIClient::Config->save($config);
 
 	return undef;
     }});
@@ -117,15 +158,18 @@ __PACKAGE__->register_method ({
     code => sub {
 	my ($param) = @_;
 
-	my $config = PVE::APIClient::Config->new();
-	$config->remove_remote($param->{name});
-	$config->save;
+	# fixme: lock config
+
+	my $config = PVE::APIClient::Config->load();
+	delete $config->{ids}->{$param->{name}};
+	PVE::APIClient::Config->save($config);
 
 	return undef;
     }});
 
 our $cmddef = {
     add => [ __PACKAGE__, 'add', ['name', 'host', 'username']],
+    update => [ __PACKAGE__, 'update', ['name']],
     remove => [ __PACKAGE__, 'remove', ['name']],
     list => [__PACKAGE__, 'list'],
 };

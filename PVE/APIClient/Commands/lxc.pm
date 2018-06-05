@@ -147,7 +147,8 @@ __PACKAGE__->register_method ({
     code => sub {
 	my ($param) = @_;
 
-	my $conn = PVE::APIClient::Config->new()->remote_conn($param->{remote});
+	my $config = PVE::APIClient::Config->load();
+	my $conn = PVE::APIClient::Config->remote_conn($config, $param->{remote});
 
 	# Get the real node from the resources endpoint
 	my $resource_list = $conn->get("api2/json/cluster/resources", { type => 'vm'});
