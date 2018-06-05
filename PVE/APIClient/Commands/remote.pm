@@ -3,7 +3,7 @@ package PVE::APIClient::Commands::remote;
 use strict;
 use warnings;
 
-use PVE::JSONSchema qw(register_standard_option get_standard_option);
+use PVE::JSONSchema qw(get_standard_option);
 use PVE::APIClient::Config;
 
 use PVE::CLIHandler;
@@ -12,19 +12,6 @@ use PVE::APIClient::LWP;
 use PVE::PTY ();
 
 use base qw(PVE::CLIHandler);
-
-my $complete_remote_name = sub {
-
-    my $config = PVE::APIClient::Config->new();
-    return $config->remote_names;
-};
-
-register_standard_option('pveclient-remote-name', {
-    description => "The name of the remote.",
-    type => 'string',
-    pattern => qr(\w+),
-    completion => $complete_remote_name,
-});
 
 sub read_password {
    return PVE::PTY::read_password("Remote password: ")

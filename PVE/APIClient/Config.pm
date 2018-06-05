@@ -5,7 +5,21 @@ use warnings;
 use JSON;
 
 use File::HomeDir ();
+use PVE::JSONSchema qw(register_standard_option get_standard_option);
 use PVE::Tools qw(file_get_contents file_set_contents);
+
+my $complete_remote_name = sub {
+
+    my $config = PVE::APIClient::Config->new();
+    return $config->remote_names;
+};
+
+register_standard_option('pveclient-remote-name', {
+    description => "The name of the remote.",
+    type => 'string',
+    pattern => qr(\w+),
+    completion => $complete_remote_name,
+});
 
 sub new {
     my ($class) = @_;
