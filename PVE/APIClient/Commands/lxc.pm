@@ -13,6 +13,7 @@ use HTTP::Response;
 use PVE::Tools;
 use PVE::JSONSchema qw(get_standard_option);
 use PVE::CLIHandler;
+use PVE::PTY;
 
 use base qw(PVE::CLIHandler);
 use PVE::APIClient::Config;
@@ -129,6 +130,32 @@ my $parse_web_socket_frame = sub  {
     return ($payload, $req_close);
 };
 
+my $client_exit = sub {
+    my ($select, $web_socket, $old_termios) = @_;
+
+    foreach my $fh ($select->handles) {
+	$select->remove($fh);
+
+	if ($fh == $web_socket) {
+	    if ($fh->connected) {
+
+		# close connection
+		# Opcode, mask, statuscode
+		my $msg = "\x88" . pack('N', 0) . pack('n', 0);
+		$fh->syswrite($msg);
+		close($fh);
+	    }
+	}
+
+    }
+
+    #
+    # Reset the terminal parameters.
+    #
+    print "\e[24H\r\n";
+    PVE::PTY::tcsetattr(*STDIN, $old_termios);
+};
+
 __PACKAGE__->register_method ({
     name => 'enter',
     path => 'enter',
@@ -215,25 +242,95 @@ __PACKAGE__->register_method ({
 	my $frame = $create_websockt_frame->($termproxy->{user} . ":" . $termproxy->{ticket} . "\n");
 	$web_socket->syswrite($frame);
 
+	# Send resize command
+	my ($columns, $rows) = PVE::PTY::tcgetsize(*STDIN);
+	$frame = $create_websockt_frame->("1:$columns:$rows:");
+	$web_socket->syswrite($frame);
+
+	# Set STDIN to "raw -echo" mode
+	my $old_termios = PVE::PTY::tcgetattr(*STDIN);
+	my $raw_termios = {%$old_termios};
+	PVE::PTY::cfmakeraw($raw_termios);
+	PVE::PTY::tcsetattr(*STDIN, $raw_termios);
+
+	# And set it to non-blocking so we can every char with IO::Select.
+	STDIN->blocking(0);
+
 	my $select = IO::Select->new;
 
 	$web_socket->blocking(0);
 	$select->add($web_socket);
+	$select->add(fileno(STDIN));
 
-	while(my @ready = $select->can_read) {
-	    foreach my $fh (@ready) {
-		if ($fh == $web_socket) {
-		    my $nr = $wb_socket_read_available_bytes->();
-		    my ($payload, $req_close) = $parse_web_socket_frame->(\$wsbuf);
-		    print "GOT: $payload\n" if defined($payload);
-		    last if $req_close;
-		    last if !$nr; # eos
-		} else {
-		    die "internal error - unknown handle";
+	my @messages;
+	my $ctrl_a_pressed_before = 0;
+	my $next_ping = time() + 3;
+
+	eval {
+	    while (1) {
+		# Ping server every 3 seconds.
+		my $now = time();
+		if ($now >= $next_ping) {
+		    push(@messages, $create_websockt_frame->("2"));
+		    $next_ping = $now + 3;
+		}
+
+		# Write
+		foreach my $fh ($select->can_write(0.5)) {
+		    if ($fh == $web_socket and my $msg = shift @messages) {
+			$fh->syswrite($msg, length($msg));
+		    }
+		}
+
+		# Read
+		foreach my $fh ($select->can_read(0.5)) {
+
+		    # From Web Socket
+		    if ($fh == $web_socket) {
+			# Read from WebSocket
+			my $nr = $wb_socket_read_available_bytes->();
+			my ($payload, $req_close) = $parse_web_socket_frame->(\$wsbuf);
+
+			if ($payload ne "OK") {
+			    syswrite(\*STDOUT, $payload, length($payload));
+			}
+		    }
+
+		    # From STDIN
+		    elsif ($fh == fileno(STDIN)) {
+
+			# Read from STDIN
+			my $nr = read(\*STDIN, my $buff, 4096);
+			if (!$nr) {
+			    next;
+			}
+
+			my $char = ord($buff);
+
+			if ($ctrl_a_pressed_before == 1 && $char == hex("0x71")) {
+			    $client_exit->($select, $web_socket, $old_termios);
+			    return;
+			}
+
+			if ($char == hex("0x01")) {
+			    if ($ctrl_a_pressed_before == 0) {
+				$ctrl_a_pressed_before = 1;
+			    }
+			}
+			else {
+			    $ctrl_a_pressed_before = 0;
+			}
+
+			push(@messages, $create_websockt_frame->("0:" . $nr . ":" . $buff));
+		    }
 		}
 	    }
-	}
+	};
+	print "ERROR: " . $@ . ".\n" if $@;
 
+	$client_exit->($select, $web_socket, $old_termios);
+
+	return undef
     }});
 
 __PACKAGE__->register_method ({
