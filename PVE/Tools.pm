@@ -14,6 +14,7 @@ $IPV4RE
 split_list
 file_set_contents
 file_get_contents
+extract_param
 );
 
 my $IPV4OCTET = "(?:25[0-5]|(?:2[0-4]|1[0-9]|[1-9])?[0-9])";
@@ -132,6 +133,15 @@ sub split_args {
     my ($str) = @_;
 
     return $str ? [ Text::ParseWords::shellwords($str) ] : [];
+}
+
+sub extract_param {
+    my ($param, $key) = @_;
+
+    my $res = $param->{$key};
+    delete $param->{$key};
+
+    return $res;
 }
 
 1;
