@@ -4,7 +4,6 @@ use strict;
 use warnings;
 use JSON;
 
-use File::HomeDir ();
 use PVE::JSONSchema qw(register_standard_option get_standard_option);
 use PVE::SectionConfig;
 use PVE::Tools qw(file_get_contents file_set_contents);
@@ -90,7 +89,11 @@ sub private {
 sub config_filename {
     my ($class) = @_;
 
-    return File::HomeDir::home() . '/.pveclient';
+    my $home = $ENV{HOME};
+
+    die "environment HOME not set\n" if !defined($home);
+
+    return "$home/.pveclient";
 }
 
 sub load {
