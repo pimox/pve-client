@@ -45,7 +45,7 @@ __PACKAGE__->register_method ({
 
 		    if (ref($def->{$cmd}) eq 'ARRAY') {
 			my ($class, $name, $arg_param, $fixed_param) = @{$def->{$cmd}};
-			$text .= $class->usage_str($name, "pveclient $subcommand $name", $arg_param, $fixed_param, $format);
+			$text .= $class->usage_str($name, "pveclient $subcommand $name", $arg_param, $fixed_param, $format, $class->can('read_password'));
 		    }
 		}
 	    } else {
