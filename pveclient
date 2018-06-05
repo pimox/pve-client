@@ -30,24 +30,6 @@ sub call_method {
     die "implement me";
 }
 
-# NOTE: This binary is just a placeholer - nothing implemented so far!
-
-#my $hostname = 'localhost';
-#my $username = 'root@pam';
-#
-#my $conn = PVE::APIClient::LWP->new(
-#    username => $username,
-#    #password => 'yourpassword',
-#    #ticket => $ticket,
-#    #csrftoken => $csrftoken,
-#    host => $hostname,
-#    # allow manual fingerprint verification
-#    manual_verification => 1,
-#    );
-
-#my $res = $conn->get("/", {});
-#print to_json($res, { pretty => 1, canonical => 1});
-
 my $cli_class_handlers = {
     lxc => 'PVE::APIClient::Commands::lxc',
     remote => 'PVE::APIClient::Commands::remote',
