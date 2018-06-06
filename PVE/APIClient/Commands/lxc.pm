@@ -150,7 +150,7 @@ my $client_exit = sub {
     }
 
     # switch back to blocking mode (else later shell commands will fail).
-    STDIN->blocking(0);
+    STDIN->blocking(1);
 
     #
     # Reset the terminal parameters.
