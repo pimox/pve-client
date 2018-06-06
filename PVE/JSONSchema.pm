@@ -1406,6 +1406,8 @@ sub get_options {
 	    raise("too many arguments\n", code => HTTP_BAD_REQUEST)
 		if scalar(@$args) != 0;
 	}
+    } else {
+	raise("not enough arguments\n", code => HTTP_BAD_REQUEST) if ref($arg_param) && scalar(@$arg_param);
     }
 
     if (my $pd = $schema->{properties}->{password}) {
