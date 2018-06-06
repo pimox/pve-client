@@ -71,15 +71,13 @@ my $create_websockt_frame = sub {
 my $parse_web_socket_frame = sub  {
     my ($wsbuf_ref) = @_;
 
-    my $wsbuf = $$wsbuf_ref;
-
     my $payload;
     my $req_close = 0;
 
-    while (my $len = length($wsbuf)) {
+    while (my $len = length($$wsbuf_ref)) {
 	last if $len < 2;
 
-	my $hdr = unpack('C', substr($wsbuf, 0, 1));
+	my $hdr = unpack('C', substr($$wsbuf_ref, 0, 1));
 	my $opcode = $hdr & 0b00001111;
 	my $fin = $hdr & 0b10000000;
 
@@ -88,7 +86,7 @@ my $parse_web_socket_frame = sub  {
 	my $rsv = $hdr & 0b01110000;
 	die "received websocket frame with RSV flags\n" if $rsv;
 
-	my $payload_len = unpack 'C', substr($wsbuf, 1, 1);
+	my $payload_len = unpack 'C', substr($$wsbuf_ref, 1, 1);
 
 	my $masked = $payload_len & 0b10000000;
 	die "received masked websocket frame from server\n" if $masked;
@@ -97,11 +95,11 @@ my $parse_web_socket_frame = sub  {
 	$payload_len = $payload_len & 0b01111111;
 	if ($payload_len == 126) {
 	    last if $len < 4;
-	    $payload_len = unpack('n', substr($wsbuf, $offset, 2));
+	    $payload_len = unpack('n', substr($$wsbuf_ref, $offset, 2));
 	    $offset += 2;
 	} elsif ($payload_len == 127) {
 	    last if $len < 10;
-	    $payload_len = unpack('Q>', substr($wsbuf, $offset, 8));
+	    $payload_len = unpack('Q>', substr($$wsbuf_ref, $offset, 8));
 	    $offset += 8;
 	}
 
@@ -110,7 +108,7 @@ my $parse_web_socket_frame = sub  {
 
 	last if $len < ($offset + $payload_len);
 
-	my $data = substr($wsbuf, 0, $offset + $payload_len, ''); # now consume data
+	my $data = substr($$wsbuf_ref, 0, $offset + $payload_len, ''); # now consume data
 
 	my $frame_data = substr($data, $offset, $payload_len);
 
