@@ -128,35 +128,6 @@ my $parse_web_socket_frame = sub  {
     return ($payload, $req_close);
 };
 
-my $client_exit = sub {
-    my ($select, $web_socket, $old_termios) = @_;
-
-    foreach my $fh ($select->handles) {
-	$select->remove($fh);
-
-	if ($fh == $web_socket) {
-	    if ($fh->connected) {
-
-		# close connection
-		# Opcode, mask, statuscode
-		my $msg = "\x88" . pack('N', 0) . pack('n', 0);
-		$fh->syswrite($msg);
-		close($fh);
-	    }
-	}
-
-    }
-
-    # switch back to blocking mode (else later shell commands will fail).
-    STDIN->blocking(1);
-
-    #
-    # Reset the terminal parameters.
-    #
-    print "\e[24H\r\n";
-    PVE::PTY::tcsetattr(*STDIN, $old_termios);
-};
-
 __PACKAGE__->register_method ({
     name => 'enter',
     path => 'enter',
@@ -251,87 +222,90 @@ __PACKAGE__->register_method ({
 	# Set STDIN to "raw -echo" mode
 	my $old_termios = PVE::PTY::tcgetattr(*STDIN);
 	my $raw_termios = {%$old_termios};
-	PVE::PTY::cfmakeraw($raw_termios);
-	PVE::PTY::tcsetattr(*STDIN, $raw_termios);
-
-	# And set it to non-blocking so we can every char with IO::Select.
-	STDIN->blocking(0);
 
 	my $select = IO::Select->new;
 
-	$web_socket->blocking(0);
-	$select->add($web_socket);
-	$select->add(fileno(STDIN));
-
-	my @messages;
-	my $ctrl_a_pressed_before = 0;
-	my $next_ping = time() + 3;
-
 	eval {
+	    $SIG{TERM} = $SIG{INT} = $SIG{KILL} = sub { die "received interrupt\n"; };
+
+	    PVE::PTY::cfmakeraw($raw_termios);
+	    PVE::PTY::tcsetattr(*STDIN, $raw_termios);
+
+	    # And set it to non-blocking so we can every char with IO::Select.
+	    STDIN->blocking(0);
+
+	    $web_socket->blocking(1);
+	    $select->add($web_socket);
+	    my $input_fh = fileno(STDIN);
+	    $select->add($input_fh);
+
+	    my $ctrl_a_pressed_before = 0;
+
 	    while (1) {
-		# Ping server every 3 seconds.
-		my $now = time();
-		if ($now >= $next_ping) {
-		    push(@messages, $create_websockt_frame->("2"));
-		    $next_ping = $now + 3;
-		}
+		while(my @ready = $select->can_read(3)) {
+		    foreach my $fh (@ready) {
 
-		# Write
-		foreach my $fh ($select->can_write(0.5)) {
-		    if ($fh == $web_socket and my $msg = shift @messages) {
-			$fh->syswrite($msg, length($msg));
-		    }
-		}
+			if ($fh == $web_socket) {
+			    # Read from WebSocket
 
-		# Read
-		foreach my $fh ($select->can_read(0.5)) {
-
-		    # From Web Socket
-		    if ($fh == $web_socket) {
-			# Read from WebSocket
-			my $nr = $wb_socket_read_available_bytes->();
-			my ($payload, $req_close) = $parse_web_socket_frame->(\$wsbuf);
-
-			if ($payload ne "OK") {
-			    syswrite(\*STDOUT, $payload, length($payload));
-			}
-		    }
-
-		    # From STDIN
-		    elsif ($fh == fileno(STDIN)) {
-
-			# Read from STDIN
-			my $nr = read(\*STDIN, my $buff, 4096);
-			if (!$nr) {
-			    next;
-			}
-
-			my $char = ord($buff);
-
-			if ($ctrl_a_pressed_before == 1 && $char == hex("0x71")) {
-			    $client_exit->($select, $web_socket, $old_termios);
-			    return;
-			}
-
-			if ($char == hex("0x01")) {
-			    if ($ctrl_a_pressed_before == 0) {
-				$ctrl_a_pressed_before = 1;
+			    my $nr = $wb_socket_read_available_bytes->();
+			    if (!defined($nr)) {
+				die "web socket read error $!\n";
+			    } elsif ($nr == 0) {
+				return; # EOF
+			    } else {
+				my ($payload, $req_close) = $parse_web_socket_frame->(\$wsbuf);
+				if ($payload) {
+				    syswrite(\*STDOUT, $payload);
+				}
+				return if $req_close;
 			    }
-			}
-			else {
-			    $ctrl_a_pressed_before = 0;
-			}
 
-			push(@messages, $create_websockt_frame->("0:" . $nr . ":" . $buff));
+			} elsif ($fh == $input_fh) {
+			    # Read from STDIN
+
+			    my $nr = read(\*STDIN, my $buff, 4096);
+			    return if !$nr; # EOF or error
+
+			    my $char = ord($buff);
+
+			    # check for CTRL-a-q
+			    return if $ctrl_a_pressed_before == 1 && $char == hex("0x71");
+
+			    $ctrl_a_pressed_before = ($char == hex("0x01") && $ctrl_a_pressed_before == 0) ? 1 : 0;
+
+			    my $frame = $create_websockt_frame->("0:" . $nr . ":" . $buff);
+			    syswrite($web_socket, $frame);
+			}
 		    }
 		}
+		# got timeout
+		syswrite($web_socket, $create_websockt_frame->("2")); # ping server to keep connection alive
 	    }
 	};
-	print "ERROR: " . $@ . ".\n" if $@;
+	my $err = $@;
 
-	$client_exit->($select, $web_socket, $old_termios);
+	eval {  # cleanup
 
-	return undef
+	    # switch back to blocking mode (else later shell commands will fail).
+	    STDIN->blocking(1);
+
+	    if ($web_socket->connected) {
+		# close connection
+		my $msg = "\x88" . pack('N', 0) . pack('n', 0); # Opcode, mask, statuscode
+		$web_socket->syswrite($msg);
+		close($web_socket);
+	    }
+
+	    # Reset the terminal parameters.
+	    syswrite(\*STDOUT, "\e[24H\r\n");
+	    PVE::PTY::tcsetattr(*STDIN, $old_termios);
+	};
+	warn $@ if $@; # show cleanup errors
+
+	print STDERR "\nERROR: $err" if $err;
+
+	return undef;
     }});
 
 __PACKAGE__->register_method ({
