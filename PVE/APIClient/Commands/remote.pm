@@ -80,13 +80,7 @@ __PACKAGE__->register_method ({
 	    };
 	}
 
-	my $api = PVE::APIClient::LWP->new(
-	    manual_verification     => 1,
-	    register_fingerprint_cb => sub {
-		my $fp = shift @_;
-		$last_fp = $fp;
-	    },
-	);
+	my $api = PVE::APIClient::LWP->new(%$setup);
 	$api->login();
 
 	$param->{fingerprint} = $last_fp if !defined($param->{fingerprint});
