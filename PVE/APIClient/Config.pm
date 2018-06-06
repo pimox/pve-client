@@ -76,7 +76,7 @@ sub options {
 	host => { optional => 0 },
 	comment => { optional => 1 },
 	username => { optional => 0 },
-	password => { optional => 0 },
+	password => { optional => 1 },
 	port => { optional => 1 },
 	fingerprint => { optional => 1 },
    };
@@ -138,11 +138,17 @@ sub remote_conn {
     my ($class, $cfg, $remote) = @_;
 
     my $section = $class->lookup_remote($cfg, $remote);
+
+    my $password = $section->{password};
+    if (!defined($password)) {
+	$password = PVE::PTY::read_password("Remote password: ")
+    }
+
     my $conn = PVE::APIClient::LWP->new(
 	username                => $section->{username},
-	password                => $section->{password},
+	password                => $password,
 	host                    => $section->{host},
-	port                    => $section->{port},
+	port                    => $section->{port} // 8006,
 	cached_fingerprints     => {
 	    $section->{fingerprint} => 1,
 	}

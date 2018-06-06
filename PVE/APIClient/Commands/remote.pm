@@ -61,9 +61,14 @@ __PACKAGE__->register_method ({
 
 	my $last_fp = 0;
 
+	my $password = $param->{password};
+	if (!defined($password)) {
+	    $password = PVE::PTY::read_password("Remote password: ");
+	}
+
 	my $setup = {
 	    username                => $param->{username},
-	    password                => $param->{password},
+	    password                => $password,
 	    host                    => $param->{host},
 	    port                    => $param->{port} // 8006,
 	};
