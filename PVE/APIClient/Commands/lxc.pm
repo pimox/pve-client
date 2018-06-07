@@ -262,8 +262,24 @@ __PACKAGE__->register_method ({
 
 	    my $ctrl_a_pressed_before = 0;
 
+	    my $winch_received = 0;
+	    $SIG{WINCH} = sub { $winch_received = 1; };
+
+	    my $check_terminal_size = sub {
+		my ($ncols, $nrows) = PVE::PTY::tcgetsize(*STDIN);
+		if ($ncols != $columns or $nrows != $rows) {
+		    $columns = $ncols;
+		    $rows = $nrows;
+		    $frame = $create_websockt_frame->("1:$columns:$rows:");
+		    $full_write->($web_socket, $frame);
+		}
+		$winch_received = 0;
+	    };
+
 	    while (1) {
 		while(my @ready = $select->can_read(3)) {
+		    $check_terminal_size->() if $winch_received;
+
 		    foreach my $fh (@ready) {
 
 			if ($fh == $web_socket) {
@@ -300,6 +316,8 @@ __PACKAGE__->register_method ({
 			}
 		    }
 		}
+		$check_terminal_size->() if $winch_received;
+
 		# got timeout
 		$full_write->($web_socket, $create_websockt_frame->("2")); # ping server to keep connection alive
 	    }
