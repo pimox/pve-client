@@ -19,7 +19,7 @@ use base qw(PVE::CLIHandler);
 use PVE::APIClient::Config;
 
 my $CRLF = "\x0D\x0A";
-my $max_payload_size = 65536;
+my $max_payload_size = 128*1024;
 
 my $build_web_socket_request = sub {
     my ($host, $path, $ticket, $termproxy) = @_;
