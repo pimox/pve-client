@@ -2,6 +2,7 @@ package PVE::APIClient::Commands::lxc;
 
 use strict;
 use warnings;
+use Errno qw(EINTR EAGAIN);
 use JSON;
 use URI::Escape;
 use IO::Select;
@@ -128,6 +129,26 @@ my $parse_web_socket_frame = sub  {
     return ($payload, $req_close);
 };
 
+my $full_write = sub {
+    my ($fh, $data) = @_;
+
+    my $len = length($data);
+    my $todo = $len;
+    my $offset = 0;
+    while(1) {
+	my $nr = syswrite($fh, $data, $todo, $offset);
+	if (!defined($nr)) {
+	    next if $! == EINTR || $! == EAGAIN;
+	    die "console write error - $!\n"
+	}
+	$offset += $nr;
+	$todo -= $nr;
+	last if $todo <= 0;
+    }
+
+    return $len;
+};
+
 __PACKAGE__->register_method ({
     name => 'enter',
     path => 'enter',
@@ -175,7 +196,7 @@ __PACKAGE__->register_method ({
 	my ($request, $wskey) = $build_web_socket_request->(
 	    $conn->{host}, "/$api_path/vncwebsocket", $conn->{ticket}, $termproxy);
 
-	$web_socket->syswrite($request);
+	$full_write->($web_socket, $request);
 
 	my $wsbuf = '';
 
@@ -212,12 +233,12 @@ __PACKAGE__->register_method ({
 
 	# send auth again...
 	my $frame = $create_websockt_frame->($termproxy->{user} . ":" . $termproxy->{ticket} . "\n");
-	$web_socket->syswrite($frame);
+	$full_write->($web_socket, $frame);
 
 	# Send resize command
 	my ($columns, $rows) = PVE::PTY::tcgetsize(*STDIN);
 	$frame = $create_websockt_frame->("1:$columns:$rows:");
-	$web_socket->syswrite($frame);
+	$full_write->($web_socket, $frame);
 
 	# Set STDIN to "raw -echo" mode
 	my $old_termios = PVE::PTY::tcgetattr(*STDIN);
@@ -256,7 +277,7 @@ __PACKAGE__->register_method ({
 			    } else {
 				my ($payload, $req_close) = $parse_web_socket_frame->(\$wsbuf);
 				if ($payload) {
-				    syswrite(\*STDOUT, $payload);
+				    $full_write->(\*STDOUT, $payload);
 				}
 				return if $req_close;
 			    }
@@ -275,12 +296,12 @@ __PACKAGE__->register_method ({
 			    $ctrl_a_pressed_before = ($char == hex("0x01") && $ctrl_a_pressed_before == 0) ? 1 : 0;
 
 			    my $frame = $create_websockt_frame->("0:" . $nr . ":" . $buff);
-			    syswrite($web_socket, $frame);
+			    $full_write->($web_socket, $frame);
 			}
 		    }
 		}
 		# got timeout
-		syswrite($web_socket, $create_websockt_frame->("2")); # ping server to keep connection alive
+		$full_write->($web_socket, $create_websockt_frame->("2")); # ping server to keep connection alive
 	    }
 	};
 	my $err = $@;
@@ -293,12 +314,12 @@ __PACKAGE__->register_method ({
 	    if ($web_socket->connected) {
 		# close connection
 		my $msg = "\x88" . pack('N', 0) . pack('n', 0); # Opcode, mask, statuscode
-		$web_socket->syswrite($msg);
+		$full_write->($web_socket, $msg);
 		close($web_socket);
 	    }
 
 	    # Reset the terminal parameters.
-	    syswrite(\*STDOUT, "\e[24H\r\n");
+	    $full_write->(\*STDOUT, "\e[24H\r\n");
 	    PVE::PTY::tcsetattr(*STDIN, $old_termios);
 	};
 	warn $@ if $@; # show cleanup errors
