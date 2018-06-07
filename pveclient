@@ -31,6 +31,7 @@ sub call_method {
     die "implement me";
 }
 
+
 my $cli_class_handlers = {
     list => 'PVE::APIClient::Commands::list',
     lxc => 'PVE::APIClient::Commands::lxc',
@@ -44,19 +45,19 @@ if (!defined($cmd)) {
     exit(-1);
 }
 
-if ($cmd eq 'get') {
-    my $method = 'GET';
+my $method_map = {
+    create => 'POST',
+    set => 'PUT',
+    get => 'GET',
+    delete => 'DELETE',
+};
+
+if (my $method = $method_map->{$cmd}) {
     my $path;
     if (scalar(@ARGV) && $ARGV[0] !~ m/^\-/)  {
 	$path = shift @ARGV;
     }
     my $res = call_method($path, $method, \@ARGV);
-    die "implement me";
-} elsif ($cmd eq 'set') {
-    die "implement me";
-} elsif ($cmd eq 'create') {
-    die "implement me";
-} elsif ($cmd eq 'delete') {
     die "implement me";
 } elsif (my $class = $cli_class_handlers->{$cmd}) {
     $class->run_cli_handler();
@@ -78,14 +79,26 @@ if ($cmd eq 'get') {
 
 	my $cmdline = substr($ENV{COMP_LINE}, 0, $ENV{COMP_POINT});
 	my ($bash_command, $cur, $prev) = @ARGV;
-	$cmdline =~ s/$cur$//;
+	$cmdline =~ s/\Q$cur\E$//;
 
 	my $args = PVE::Tools::split_args($cmdline);
 
-	my @cmds = ('get', 'set', 'create', 'delete', keys %$cli_class_handlers);
+	my @cmds = (keys %$method_map, keys %$cli_class_handlers);
 	if (scalar(@$args) == 1) {
 	    foreach my $p (@cmds) {
 		print "$p\n" if $p =~ m/^$cur/;
+	    }
+	} elsif (scalar(@$args) == 2) {
+	    if (my $method = $method_map->{$args->[1]}) {
+		PVE::APIClient::Helpers::complete_api_path($cur);
+	    }
+	} elsif (scalar(@$args) >= 3) {
+	    my $path = $args->[2];
+	    if (my $method = $method_map->{$args->[1]}) {
+		if (my $info = PVE::APIClient::Helpers::lookup_api_method($path, $method, 1)) {
+		    my $prop = $info->{parameters}->{properties};
+		    PVE::APIClient::Helpers::complete_api_call_options($method, $prop, $prev, $cur, $args);
+		}
 	    }
 	}
     }
