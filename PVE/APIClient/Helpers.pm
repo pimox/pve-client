@@ -53,17 +53,98 @@ sub get_api_definition {
 }
 
 sub lookup_api_method {
-    my ($path, $method) = @_;
+    my ($path, $method, $noerr) = @_;
 
     get_api_definition(); # make sure API data is loaded
 
-    my $info = $pve_api_path_hash->{$path} ||
-	die "unable to find API info for path '$path'\n";
+    my $info = $pve_api_path_hash->{$path};
 
-    my $data = $info->{info}->{$method} ||
+    if (!$info) {
+	return undef if $noerr;
+	die "unable to find API info for path '$path'\n";
+    }
+
+    my $data = $info->{info}->{$method};
+
+    if (!$data) {
+	return undef if $noerr;
 	die "unable to find API method '$method' for path '$path'\n";
+    }
 
     return $data;
+}
+
+sub complete_api_call_options {
+    my ($cmd, $prop, $prev, $cur, $args) = @_;
+
+    my $print_result = sub {
+	foreach my $p (@_) {
+	    print "$p\n" if $p =~ m/^$cur/;
+	}
+    };
+
+    my $print_parameter_completion = sub {
+	my ($pname) = @_;
+	my $d = $prop->{$pname};
+	if ($d->{completion}) {
+	    my $vt = ref($d->{completion});
+	    if ($vt eq 'CODE') {
+		my $res = $d->{completion}->($cmd, $pname, $cur, $args);
+		&$print_result(@$res);
+	    }
+	} elsif ($d->{type} eq 'boolean') {
+	    &$print_result('0', '1');
+	} elsif ($d->{enum}) {
+	    &$print_result(@{$d->{enum}});
+	}
+    };
+
+    my @option_list = ();
+    foreach my $key (keys %$prop) {
+	push @option_list, "--$key";
+    }
+
+    if ($cur =~ m/^-/) {
+	&$print_result(@option_list);
+	return;
+    }
+
+    if ($prev =~ m/^--?(.+)$/ && $prop->{$1}) {
+	my $pname = $1;
+	&$print_parameter_completion($pname);
+	return;
+    }
+
+    &$print_result(@option_list);
+}
+
+sub complete_api_path {
+    my ($text) = @_;
+
+    get_api_definition(); # make sure API data is loaded
+
+    $text =~ s!^/!!;
+
+    my ($dir, $rest) = $text =~ m|^(?:(.*)/)?(?:([^/]*))?$|;
+
+    my $info;
+    if (!defined($dir)) {
+	$dir = '';
+	$info = { children => $pve_api_definition };
+    } else {
+	$info = $pve_api_path_hash->{"/$dir"};
+    }
+
+    if ($info) {
+	if (my $children = $info->{children}) {
+	    foreach my $c (@$children) {
+		if ($c->{path} =~ m!\Q$dir/$rest!) {
+		    print "$c->{path}\n";
+		    print "$c->{path}/\n"if $c->{children};
+		}
+	    }
+	}
+    }
 }
 
 1;
