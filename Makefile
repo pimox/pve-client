@@ -20,7 +20,7 @@ deb ${DEB}:
 	cd build; dpkg-buildpackage -rfakeroot -b -us -uc
 	lintian ${DEB}
 
-install:  pve-api-definition.js
+install:  pve-api-definition.dat
 	install -d -m 0755 ${LIB_DIR}/PVE
 	# install library tools from pve-common
 	install -m 0644 PVE/Tools.pm ${LIB_DIR}/PVE
@@ -37,14 +37,14 @@ install:  pve-api-definition.js
 	install -D -m 0644 PVE/APIClient/Commands/remote.pm ${LIB_DIR}/PVE/APIClient/Commands/remote.pm
 	install -D -m 0644 PVE/APIClient/Commands/lxc.pm ${LIB_DIR}/PVE/APIClient/Commands/lxc.pm
 	install -D -m 0644 PVE/APIClient/Commands/help.pm ${LIB_DIR}/PVE/APIClient/Commands/help.pm
-	install -D -m 0644 pve-api-definition.js ${LIB_DIR}/pve-api-definition.js
+	install -D -m 0644 pve-api-definition.dat ${LIB_DIR}/pve-api-definition.dat
 	install -D -m 0755 pveclient ${DESTDIR}/usr/bin/pveclient
 	install -D -m 0644 pveclient.bash-completion ${BASHCOMPLDIR}/pveclient
 
 
-pve-api-definition.js:
-	./extractapi.pl > pve-api-definition.js.tmp
-	mv pve-api-definition.js.tmp pve-api-definition.js
+pve-api-definition.dat:
+	./extractapi.pl > pve-api-definition.dat.tmp
+	mv pve-api-definition.dat.tmp pve-api-definition.dat
 
 #.PHONY: upload
 #upload: ${DEB}

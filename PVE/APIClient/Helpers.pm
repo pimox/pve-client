@@ -3,7 +3,7 @@ package PVE::APIClient::Helpers;
 use strict;
 use warnings;
 
-use Data::Dumper;
+use Storable;
 use JSON;
 use PVE::APIClient::Exception qw(raise);
 use Encode::Locale;
@@ -13,7 +13,7 @@ use HTTP::Status qw(:constants);
 my $pve_api_definition;
 my $pve_api_path_hash;
 
-my $pve_api_definition_fn = "/usr/share/pve-client/pve-api-definition.js";
+my $pve_api_definition_fn = "/usr/share/pve-client/pve-api-definition.dat";
 
 my $build_pve_api_path_hash;
 $build_pve_api_path_hash = sub {
@@ -39,15 +39,11 @@ $build_pve_api_path_hash = sub {
 sub get_api_definition {
 
     if (!defined($pve_api_definition)) {
-	local $/;
 	open(my $fh, '<',  $pve_api_definition_fn) ||
 	    die "unable to open '$pve_api_definition_fn' - $!\n";
-	my $json_text = <$fh>;
-	$pve_api_definition = decode_json($json_text);
-
+	$pve_api_definition = Storable::fd_retrieve($fh);
 	$build_pve_api_path_hash->($pve_api_definition);
     }
-
 
     return $pve_api_definition;
 }
