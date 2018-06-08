@@ -244,7 +244,11 @@ __PACKAGE__->register_method ({
 	my $old_termios = PVE::PTY::tcgetattr(*STDIN);
 	my $raw_termios = {%$old_termios};
 
-	my $select = IO::Select->new;
+	my $read_select = IO::Select->new;
+	my $write_select = IO::Select->new;
+
+	my $output_buffer = ''; # write buffer for STDOUT
+	my $websock_buffer = ''; # write buffer for $web_socket
 
 	eval {
 	    $SIG{TERM} = $SIG{INT} = $SIG{KILL} = sub { die "received interrupt\n"; };
@@ -254,11 +258,12 @@ __PACKAGE__->register_method ({
 
 	    # And set it to non-blocking so we can every char with IO::Select.
 	    STDIN->blocking(0);
-
 	    $web_socket->blocking(1);
-	    $select->add($web_socket);
+	    $read_select->add($web_socket);
 	    my $input_fh = fileno(STDIN);
-	    $select->add($input_fh);
+	    $read_select->add($input_fh);
+
+	    my $output_fh = fileno(STDOUT);
 
 	    my $ctrl_a_pressed_before = 0;
 
@@ -270,15 +275,37 @@ __PACKAGE__->register_method ({
 		if ($ncols != $columns or $nrows != $rows) {
 		    $columns = $ncols;
 		    $rows = $nrows;
-		    $frame = $create_websockt_frame->("1:$columns:$rows:");
-		    $full_write->($web_socket, $frame);
+		    $websock_buffer .= $create_websockt_frame->("1:$columns:$rows:");
+		    $write_select->add($web_socket);
 		}
 		$winch_received = 0;
 	    };
 
+	    my $drain_buffer = sub {
+		my ($fh, $buffer_ref) = @_;
+
+		my $len = length($$buffer_ref);
+		my $nr = syswrite($fh, $$buffer_ref);
+		if (!defined($nr)) {
+		    next if $! == EINTR || $! == EAGAIN;
+		    die "drain buffer - write error - $!\n";
+		}
+		return $nr if !$nr;
+		substr($$buffer_ref, 0, $nr, '');
+		$write_select->remove($fh) if !length($$buffer_ref);
+	    };
+
 	    while (1) {
-		while(my ($readable) = IO::Select->select($select, undef, undef, 3)) {
+		while(my ($readable, $writable) = IO::Select->select($read_select, $write_select, undef, 3)) {
 		    $check_terminal_size->() if $winch_received;
+
+		    foreach my $fh (@$writable) {
+			if ($fh == $output_fh) {
+			    $drain_buffer->(\*STDOUT, \$output_buffer);
+			} elsif ($fh == $web_socket) {
+			    $drain_buffer->($web_socket, \$websock_buffer);
+			}
+		    }
 
 		    foreach my $fh (@$readable) {
 
@@ -293,7 +320,8 @@ __PACKAGE__->register_method ({
 			    } else {
 				my ($payload, $req_close) = $parse_web_socket_frame->(\$wsbuf);
 				if ($payload) {
-				    $full_write->(\*STDOUT, $payload);
+				    $output_buffer .= $payload;
+				    $write_select->add($output_fh);
 				}
 				return if $req_close;
 			    }
@@ -311,15 +339,16 @@ __PACKAGE__->register_method ({
 
 			    $ctrl_a_pressed_before = ($char == hex("0x01") && $ctrl_a_pressed_before == 0) ? 1 : 0;
 
-			    my $frame = $create_websockt_frame->("0:" . $nr . ":" . $buff);
-			    $full_write->($web_socket, $frame);
+			    $websock_buffer .= $create_websockt_frame->("0:" . $nr . ":" . $buff);
+			    $write_select->add($web_socket);
 			}
 		    }
 		}
 		$check_terminal_size->() if $winch_received;
 
 		# got timeout
-		$full_write->($web_socket, $create_websockt_frame->("2")); # ping server to keep connection alive
+		$websock_buffer .= $create_websockt_frame->("2"); # ping server to keep connection alive
+		$write_select->add($web_socket);
 	    }
 	};
 	my $err = $@;
@@ -331,13 +360,17 @@ __PACKAGE__->register_method ({
 
 	    if ($web_socket->connected) {
 		# close connection
-		my $msg = "\x88" . pack('N', 0) . pack('n', 0); # Opcode, mask, statuscode
-		$full_write->($web_socket, $msg);
+		$websock_buffer .= "\x88" . pack('N', 0) . pack('n', 0); # Opcode, mask, statuscode
+		$full_write->($web_socket, $websock_buffer);
+		$websock_buffer = '';
 		close($web_socket);
 	    }
 
 	    # Reset the terminal parameters.
-	    $full_write->(\*STDOUT, "\e[24H\r\n");
+	    $output_buffer .= "\e[24H\r\n";
+	    $full_write->(\*STDOUT, $output_buffer);
+	    $output_buffer = '';
+
 	    PVE::PTY::tcsetattr(*STDIN, $old_termios);
 	};
 	warn $@ if $@; # show cleanup errors
