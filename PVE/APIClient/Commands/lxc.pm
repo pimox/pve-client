@@ -260,10 +260,10 @@ __PACKAGE__->register_method ({
 	    STDIN->blocking(0);
 	    $web_socket->blocking(1);
 	    $read_select->add($web_socket);
-	    my $input_fh = fileno(STDIN);
+	    my $input_fh = \*STDIN;
 	    $read_select->add($input_fh);
 
-	    my $output_fh = fileno(STDOUT);
+	    my $output_fh = \*STDOUT;
 
 	    my $ctrl_a_pressed_before = 0;
 
@@ -304,7 +304,7 @@ __PACKAGE__->register_method ({
 
 		    foreach my $fh (@$writable) {
 			if ($fh == $output_fh) {
-			    $drain_buffer->(\*STDOUT, \$output_buffer);
+			    $drain_buffer->($output_fh, \$output_buffer);
 			    $read_select->add($web_socket) if length($output_buffer) <= $max_buffer_len;
 			} elsif ($fh == $web_socket) {
 			    $drain_buffer->($web_socket, \$websock_buffer);
@@ -336,7 +336,7 @@ __PACKAGE__->register_method ({
 			} elsif ($fh == $input_fh) {
 			    # Read from STDIN
 
-			    my $nr = read(\*STDIN, my $buff, 4096);
+			    my $nr = sysread($input_fh, my $buff, 4096);
 			    return if !$nr; # EOF or error
 
 			    my $char = ord($buff);
