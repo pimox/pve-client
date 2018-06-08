@@ -202,7 +202,9 @@ __PACKAGE__->register_method ({
 
 	my $wb_socket_read_available_bytes = sub {
 	    my $nr = $web_socket->sysread($wsbuf, $max_payload_size, length($wsbuf));
-	    die "web socket read error - $!\n" if $nr < 0;
+	    if (!defined($nr) && !($! == EINTR || $! == EAGAIN)) {
+		die "web socket read error - $!\n";
+	    }
 	    return $nr;
 	};
 
@@ -318,7 +320,7 @@ __PACKAGE__->register_method ({
 
 			    my $nr = $wb_socket_read_available_bytes->();
 			    if (!defined($nr)) {
-				die "web socket read error $!\n";
+				# wait
 			    } elsif ($nr == 0) {
 				return; # EOF
 			    } else {
