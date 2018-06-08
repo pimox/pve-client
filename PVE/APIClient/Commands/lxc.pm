@@ -258,7 +258,7 @@ __PACKAGE__->register_method ({
 
 	    # And set it to non-blocking so we can every char with IO::Select.
 	    STDIN->blocking(0);
-	    $web_socket->blocking(1);
+	    $web_socket->blocking(0);
 	    $read_select->add($web_socket);
 	    my $input_fh = \*STDIN;
 	    $read_select->add($input_fh);
