@@ -277,10 +277,10 @@ __PACKAGE__->register_method ({
 	    };
 
 	    while (1) {
-		while(my @ready = $select->can_read(3)) {
+		while(my ($readable) = IO::Select->select($select, undef, undef, 3)) {
 		    $check_terminal_size->() if $winch_received;
 
-		    foreach my $fh (@ready) {
+		    foreach my $fh (@$readable) {
 
 			if ($fh == $web_socket) {
 			    # Read from WebSocket
