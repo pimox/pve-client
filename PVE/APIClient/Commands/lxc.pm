@@ -281,6 +281,8 @@ __PACKAGE__->register_method ({
 		$winch_received = 0;
 	    };
 
+	    my $max_buffer_len = 256*1024;
+
 	    my $drain_buffer = sub {
 		my ($fh, $buffer_ref) = @_;
 
@@ -292,7 +294,8 @@ __PACKAGE__->register_method ({
 		}
 		return $nr if !$nr;
 		substr($$buffer_ref, 0, $nr, '');
-		$write_select->remove($fh) if !length($$buffer_ref);
+		$len = length($$buffer_ref);
+		$write_select->remove($fh) if !$len;
 	    };
 
 	    while (1) {
@@ -302,6 +305,7 @@ __PACKAGE__->register_method ({
 		    foreach my $fh (@$writable) {
 			if ($fh == $output_fh) {
 			    $drain_buffer->(\*STDOUT, \$output_buffer);
+			    $read_select->add($web_socket) if length($output_buffer) <= $max_buffer_len;
 			} elsif ($fh == $web_socket) {
 			    $drain_buffer->($web_socket, \$websock_buffer);
 			}
@@ -319,9 +323,12 @@ __PACKAGE__->register_method ({
 				return; # EOF
 			    } else {
 				my ($payload, $req_close) = $parse_web_socket_frame->(\$wsbuf);
-				if ($payload) {
+				if (defined($payload) && length($payload)) {
 				    $output_buffer .= $payload;
 				    $write_select->add($output_fh);
+				    if (length($output_buffer) > $max_buffer_len) {
+					$read_select->remove($web_socket);
+				    }
 				}
 				return if $req_close;
 			    }
