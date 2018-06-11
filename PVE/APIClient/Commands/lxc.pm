@@ -149,6 +149,16 @@ my $full_write = sub {
     return $len;
 };
 
+# Takes an escape character with an optional '^' prefix and returns an escape
+# character code.
+my $escapekey_to_char = sub {
+    my ($def) = @_;
+    if ($def =~ /^\^?([a-zA-Z])$/) {
+	return 1 + ord(lc($1)) - ord('a');
+    }
+    die "bad escape key definition: $def\n";
+};
+
 __PACKAGE__->register_method ({
     name => 'enter',
     path => 'enter',
@@ -170,6 +180,9 @@ __PACKAGE__->register_method ({
 
 	my $config = PVE::APIClient::Config->load();
 	my $conn = PVE::APIClient::Config->remote_conn($config, $param->{remote});
+
+	# FIXME: This should come from $config
+	my $escape_char = $escapekey_to_char->('a');
 
 	# Get the real node from the resources endpoint
 	my $resource_list = $conn->get("api2/json/cluster/resources", { type => 'vm'});
@@ -268,7 +281,7 @@ __PACKAGE__->register_method ({
 
 	    my $output_fh = \*STDOUT;
 
-	    my $ctrl_a_pressed_before = 0;
+	    my $in_escape_sequence;
 
 	    my $winch_received = 0;
 	    $SIG{WINCH} = sub { $winch_received = 1; };
@@ -292,7 +305,7 @@ __PACKAGE__->register_method ({
 		my $len = length($$buffer_ref);
 		my $nr = syswrite($fh, $$buffer_ref);
 		if (!defined($nr)) {
-		    next if $! == EINTR || $! == EAGAIN;
+		    return if $! == EINTR || $! == EAGAIN;
 		    die "drain buffer - write error - $!\n";
 		}
 		return $nr if !$nr;
@@ -344,11 +357,27 @@ __PACKAGE__->register_method ({
 
 			    my $char = ord($buff);
 
-			    # check for CTRL-a-q
-			    return if $ctrl_a_pressed_before == 1 && $char == hex("0x71");
+			    # Handle escape sequences:
+			    if ($in_escape_sequence) {
+				$in_escape_sequence = 0;
+				if ($char == 0x71) {
+				    # (escape, 'q')
+				    return;
+				} elsif ($char == $escape_char) {
+				    # (escape, escape)
+				    # Pass this one through as a single escapekey
+				} else {
+				    # Unknown escape sequence
+				    # We could generate a bell or something...
+				    # but for now just skip it
+				    next;
+				}
+			    } elsif ($char == $escape_char) {
+				$in_escape_sequence = 1;
+				next;
+			    }
 
-			    $ctrl_a_pressed_before = ($char == hex("0x01") && $ctrl_a_pressed_before == 0) ? 1 : 0;
-
+			    # Pass the key through:
 			    $websock_buffer .= $create_websockt_frame->("0:" . $nr . ":" . $buff);
 			    $write_select->add($web_socket);
 			}
