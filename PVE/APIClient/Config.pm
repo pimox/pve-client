@@ -42,7 +42,7 @@ my $defaultData = {
 	    optional => 1,
 	},
 	password => {
-	    description => "The users password.",
+	    description => "The user's password.",
 	    type => 'string',
 	    optional => 1,
 	},
