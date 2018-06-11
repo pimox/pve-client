@@ -419,29 +419,8 @@ __PACKAGE__->register_method ({
 	return undef;
     }});
 
-__PACKAGE__->register_method ({
-    name => 'list',
-    path => 'list',
-    method => 'GET',
-    description => "List containers.",
-    parameters => {
-	additionalProperties => 0,
-	properties => {
-	    remote => get_standard_option('pveclient-remote-name'),
-	},
-    },
-    returns => { type => 'null'},
-    code => sub {
-	my ($param) = @_;
-
-	die "implement me";
-
-    }});
-
-
 our $cmddef = {
     enter => [ __PACKAGE__, 'enter', ['remote', 'vmid']],
-    list => [ __PACKAGE__, 'list', ['remote']],
 };
 
 1;

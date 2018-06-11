@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use PVE::APIClient::Commands::help;
+use PVE::APIClient::Commands::list;
 use PVE::APIClient::Commands::lxc;
 use PVE::APIClient::Commands::remote;
 
@@ -55,6 +56,7 @@ __PACKAGE__->register_method ({
 	};
 
 	$assemble_usage_string->('help', $PVE::APIClient::Commands::help::cmddef);
+	$assemble_usage_string->('list', $PVE::APIClient::Commands::list::cmddef);
 	$assemble_usage_string->('lxc', $PVE::APIClient::Commands::lxc::cmddef);
 	$assemble_usage_string->('remote', $PVE::APIClient::Commands::remote::cmddef);
 
