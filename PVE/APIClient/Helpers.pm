@@ -183,4 +183,43 @@ sub extract_path_info {
     return $info;
 }
 
+sub get_vmid_resource {
+    my ($conn, $vmid) = @_;
+
+    my $resources = $conn->get('api2/json/cluster/resources', {type => 'vm'});
+
+    my $resource;
+    for my $tmp (@$resources) {
+	if ($tmp->{vmid} eq $vmid) {
+	    $resource = $tmp;
+	    last;
+	}
+    }
+
+    if (!defined($resource)) {
+	die "\"$vmid\" not found";
+    }
+
+    return $resource;
+}
+
+sub poll_task {
+    my ($conn, $node, $upid) = @_;
+
+    my $path = "api2/json/nodes/$node/tasks/$upid/status";
+
+    my $task_status;
+    while(1) {
+	$task_status = $conn->get($path, {});
+
+	if ($task_status->{status} eq "stopped") {
+	    last;
+	}
+
+	sleep(10);
+    }
+
+    return $task_status->{exitstatus};
+}
+
 1;
