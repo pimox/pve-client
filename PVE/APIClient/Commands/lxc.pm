@@ -168,10 +168,7 @@ __PACKAGE__->register_method ({
 	additionalProperties => 0,
 	properties => {
 	    remote => get_standard_option('pveclient-remote-name'),
-	    vmid => {
-		description => "The container ID",
-		type => 'string',
-	    },
+	    vmid => get_standard_option('pve-vmid')
 	},
     },
     returns => { type => 'null'},
