@@ -69,10 +69,16 @@ if (my $method = $method_map->{$cmd}) {
     if ($ENV{COMP_LINE} =~ m/^(.*pveclient\s+($cmdlist)\s+)(.*)$/) {
 	my $cmd = $2;
 	my $class = $cli_class_handlers->{$cmd} || die "internal error";
-	$ENV{COMP_LINE} = "pveclient $3";
-	$ENV{COMP_POINT} = length($ENV{COMP_LINE});
-	@ARGV = ('bashcomplete', 'pveclient', $ARGV[1], $ARGV[2]);
 
+	if ($cmd eq 'list') { # simple commands
+	    $ENV{COMP_LINE} = "pveclient $3";
+	    $ENV{COMP_POINT} = length($ENV{COMP_LINE});
+	    @ARGV = ('bashcomplete', 'pveclient', $ARGV[1], $ARGV[2]);
+	} else {
+	    $ENV{COMP_LINE} = "pveclient $3";
+	    $ENV{COMP_POINT} = length($ENV{COMP_LINE});
+	    @ARGV = ('bashcomplete', 'pveclient', $ARGV[1], $ARGV[2]);
+	}
 	$class->run_cli_handler();
 
     } else {
