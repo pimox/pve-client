@@ -12,6 +12,7 @@ use PVE::CLIHandler;
 
 use PVE::APIClient::LWP;
 use PVE::APIClient::Helpers;
+use PVE::APIClient::Commands::config;
 use PVE::APIClient::Commands::remote;
 use PVE::APIClient::Commands::list;
 use PVE::APIClient::Commands::lxc;
@@ -36,6 +37,7 @@ my $cli_class_handlers = {
     list => 'PVE::APIClient::Commands::list',
     lxc => 'PVE::APIClient::Commands::lxc',
     remote => 'PVE::APIClient::Commands::remote',
+    config => 'PVE::APIClient::Commands::config',
     help => 'PVE::APIClient::Commands::help',
 };
 

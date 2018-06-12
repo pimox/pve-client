@@ -6,6 +6,7 @@ use warnings;
 use PVE::APIClient::Commands::help;
 use PVE::APIClient::Commands::list;
 use PVE::APIClient::Commands::lxc;
+use PVE::APIClient::Commands::config;
 use PVE::APIClient::Commands::remote;
 
 use PVE::CLIHandler;
@@ -59,6 +60,7 @@ __PACKAGE__->register_method ({
 	$assemble_usage_string->('list', $PVE::APIClient::Commands::list::cmddef);
 	$assemble_usage_string->('lxc', $PVE::APIClient::Commands::lxc::cmddef);
 	$assemble_usage_string->('remote', $PVE::APIClient::Commands::remote::cmddef);
+	$assemble_usage_string->('config', $PVE::APIClient::Commands::config::cmddef);
 
 	$text .= "pveclient <get/set/create/delete> <path> {options}\n\n";
 

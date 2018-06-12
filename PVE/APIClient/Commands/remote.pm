@@ -32,9 +32,10 @@ __PACKAGE__->register_method ({
 
 	printf("%10s %10s %10s %10s %100s\n", "Name", "Host", "Port", "Username", "Fingerprint");
 	for my $name (keys %{$config->{ids}}) {
-	    my $remote = $config->{ids}->{$name};
-	    printf("%10s %10s %10s %10s %100s\n", $name, $remote->{'host'},
-		   $remote->{'port'} // '-', $remote->{'username'}, $remote->{'fingerprint'} // '-');
+	    my $data = $config->{ids}->{$name};
+	    next if $data->{type} ne 'remote';
+	    printf("%10s %10s %10s %10s %100s\n", $name, $data->{'host'},
+		   $data->{'port'} // '-', $data->{'username'}, $data->{'fingerprint'} // '-');
 	}
 
 	return undef;
@@ -45,7 +46,7 @@ __PACKAGE__->register_method ({
     path => 'add',
     method => 'POST',
     description => "Add a remote to your config file.",
-    parameters => PVE::APIClient::Config->createSchema(1),
+    parameters => PVE::APIClient::RemoteConfig->createSchema(1),
     returns => { type => 'null'},
     code => sub {
 	my ($param) = @_;
@@ -103,7 +104,7 @@ __PACKAGE__->register_method ({
     path => 'update',
     method => 'PUT',
     description => "Update a remote configuration.",
-    parameters => PVE::APIClient::Config->updateSchema(1),
+    parameters => PVE::APIClient::RemoteConfig->updateSchema(1),
     returns => { type => 'null'},
     code => sub {
 	my ($param) = @_;

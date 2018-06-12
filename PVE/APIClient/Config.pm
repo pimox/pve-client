@@ -4,25 +4,32 @@ use strict;
 use warnings;
 use JSON;
 
-use PVE::JSONSchema qw(register_standard_option get_standard_option);
+use PVE::JSONSchema;
 use PVE::SectionConfig;
 use PVE::Tools qw(file_get_contents file_set_contents);
 
 use base qw(PVE::SectionConfig);
 
+my $remote_namne_regex = qw(\w+);
+
+my $defaults_section = '!DEFAULTS';
+
 my $complete_remote_name = sub {
 
     my $config = PVE::APIClient::Config->load();
-    return [keys %{$config->{ids}}];
+    my $list = [];
+    foreach my $name (keys %{$config->{ids}}) {
+	push @$list, $name if $name ne $defaults_section;
+    }
+    return $list;
 };
 
-register_standard_option('pveclient-remote-name', {
+PVE::JSONSchema::register_standard_option('pveclient-remote-name', {
     description => "The name of the remote.",
     type => 'string',
-    pattern => qr(\w+),
+    pattern => $remote_namne_regex,
     completion => $complete_remote_name,
 });
-
 
 my $defaultData = {
     propertyList => {
@@ -30,57 +37,8 @@ my $defaultData = {
 	    description => "Section type.",
 	    optional => 1,
 	},
-	name => get_standard_option('pveclient-remote-name'),
-	host => {
-	    description => "The host.",
-	    type => 'string', format => 'address',
-	    optional => 1,
-	},
-	username => {
-	    description => "The username.",
-	    type => 'string',
-	    optional => 1,
-	},
-	password => {
-	    description => "The user's password.",
-	    type => 'string',
-	    optional => 1,
-	},
-	port => {
-	    description => "The port.",
-	    type => 'integer',
-	    optional => 1,
-	    default => 8006,
-	},
-	fingerprint => {
-	    description => "Fingerprint.",
-	    type => 'string',
-	    optional => 1,
-	},
-	comment => {
-	    description => "Description.",
-	    type => 'string',
-	    optional => 1,
-	    maxLength => 4096,
-	},
     },
 };
-
-sub type {
-    return 'remote';
-}
-
-sub options {
-    return {
-	name => { optional => 0 },
-	host => { optional => 0 },
-	comment => { optional => 1 },
-	username => { optional => 0 },
-	password => { optional => 1 },
-	port => { optional => 1 },
-	fingerprint => { optional => 1 },
-   };
-}
 
 sub private {
     return $defaultData;
@@ -94,6 +52,32 @@ sub config_filename {
     die "environment HOME not set\n" if !defined($home);
 
     return "$home/.pveclient";
+}
+
+sub format_section_header {
+    my ($class, $type, $sectionId, $scfg, $done_hash) = @_;
+
+    if ($type eq 'defaults') {
+	return "defaults:\n";
+    } else {
+	return "$type: $sectionId\n";
+    }
+}
+
+sub parse_section_header {
+    my ($class, $line) = @_;
+
+    if ($line =~ m/^defaults:\s*$/) {
+	return ('defaults', $defaults_section, undef, {});
+    } elsif ($line =~ m/^(\S+):\s*(\S+)\s*$/) {
+	my ($type, $name) = (lc($1), $2);
+	eval {
+	    die "invalid remote name '$name'\n"
+		if $name eq $defaults_section || $name !~ m/^$remote_namne_regex$/;
+	};
+	return ($type, $name, $@, {});
+    }
+    return undef;
 }
 
 sub load {
@@ -119,9 +103,19 @@ sub save {
     my ($class, $cfg) = @_;
 
     my $filename = $class->config_filename();
+
+    $cfg->{order}->{$defaults_section} = -1; # write as first section
     my $raw = $class->write_config($filename, $cfg);
 
     file_set_contents($filename, $raw, 0600);
+}
+
+sub get_defaults {
+    my ($class, $cfg) = @_;
+
+    $cfg->{ids}->{$defaults_section} //= {};
+
+    return $cfg->{ids}->{$defaults_section};
 }
 
 sub lookup_remote {
@@ -159,7 +153,98 @@ sub remote_conn {
     return $conn;
 }
 
+package PVE::APIClient::RemoteConfig;
+
+use strict;
+use warnings;
+
+use PVE::JSONSchema qw(register_standard_option get_standard_option);
+use PVE::SectionConfig;
+
+use base qw( PVE::APIClient::Config);
+
+sub type {
+    return 'remote';
+}
+
+sub properties {
+    return {
+	name => get_standard_option('pveclient-remote-name'),
+	host => {
+	    description => "The host.",
+	    type => 'string', format => 'address',
+	    optional => 1,
+	},
+	username => {
+	    description => "The username.",
+	    type => 'string',
+	    optional => 1,
+	},
+	password => {
+	    description => "The users password.",
+	    type => 'string',
+	    optional => 1,
+	},
+	port => {
+	    description => "The port.",
+	    type => 'integer',
+	    optional => 1,
+	    default => 8006,
+	},
+	fingerprint => {
+	    description => "Fingerprint.",
+	    type => 'string',
+	    optional => 1,
+	},
+	comment => {
+	    description => "Description.",
+	    type => 'string',
+	    optional => 1,
+	    maxLength => 4096,
+	},
+    };
+}
+
+sub options {
+    return {
+	name => { optional => 0 },
+	host => { optional => 0 },
+	comment => { optional => 1 },
+	username => { optional => 0 },
+	password => { optional => 1 },
+	port => { optional => 1 },
+	fingerprint => { optional => 1 },
+   };
+}
+
 __PACKAGE__->register();
-__PACKAGE__->init();
+
+
+package PVE::APIClient::DefaultsConfig;
+
+use strict;
+use warnings;
+
+use PVE::JSONSchema qw(register_standard_option get_standard_option);
+
+use base qw( PVE::APIClient::Config);
+
+
+sub type {
+    return 'defaults';
+}
+
+sub options {
+    return {
+	name => { optional => 1 },
+	username => { optional => 1 },
+	port => { optional => 1 },
+   };
+}
+
+__PACKAGE__->register();
+
+
+PVE::APIClient::Config->init();
 
 1;
