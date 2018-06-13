@@ -1407,7 +1407,15 @@ sub get_options {
 		if scalar(@$args) != 0;
 	}
     } else {
-	raise("not enough arguments\n", code => HTTP_BAD_REQUEST) if ref($arg_param) && scalar(@$arg_param);
+	if (ref($arg_param)) {
+	    foreach my $arg_name (@$arg_param) {
+		if ($arg_name eq 'extra-args') {
+		    $opts->{'extra-args'} = [];
+		} else {
+		    raise("not enough arguments\n", code => HTTP_BAD_REQUEST);
+		}
+	    }
+	}
     }
 
     if (my $pd = $schema->{properties}->{password}) {
