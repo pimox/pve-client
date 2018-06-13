@@ -18,7 +18,7 @@ use PVE::APIClient::Commands::config;
 use PVE::APIClient::Commands::remote;
 use PVE::APIClient::Commands::list;
 use PVE::APIClient::Commands::lxc;
-use PVE::APIClient::Commands::start;
+use PVE::APIClient::Commands::GuestStatus;
 
 use JSON;
 
@@ -162,7 +162,8 @@ our $cmddef = {
     lxc => $PVE::APIClient::Commands::lxc::cmddef,
     remote => $PVE::APIClient::Commands::remote::cmddef,
     
-    start => $PVE::APIClient::Commands::start::cmddef,
+    start => [ 'PVE::APIClient::Commands::GuestStatus', 'start', ['remote', 'vmid']],
+    stop => [ 'PVE::APIClient::Commands::GuestStatus', 'stop', ['remote', 'vmid']],
 
     api => {
 	get => [ __PACKAGE__, 'pveclient_get', ['remote', 'api_path']],
