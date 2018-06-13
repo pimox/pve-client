@@ -18,7 +18,6 @@ use PVE::APIClient::Commands::config;
 use PVE::APIClient::Commands::remote;
 use PVE::APIClient::Commands::list;
 use PVE::APIClient::Commands::lxc;
-use PVE::APIClient::Commands::help;
 use PVE::APIClient::Commands::start;
 
 use JSON;
