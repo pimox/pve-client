@@ -15,6 +15,13 @@ my $pve_api_path_hash;
 
 my $pve_api_definition_fn = "/usr/share/pve-client/pve-api-definition.dat";
 
+my $method_map = {
+    create => 'POST',
+    set => 'PUT',
+    get => 'GET',
+    delete => 'DELETE',
+};
+
 my $build_pve_api_path_hash;
 $build_pve_api_path_hash = sub {
     my ($tree) = @_;
@@ -131,16 +138,49 @@ sub complete_api_path {
 	$info = $pve_api_path_hash->{"/$dir"};
     }
 
+    my $res = [];
     if ($info) {
 	if (my $children = $info->{children}) {
 	    foreach my $c (@$children) {
 		if ($c->{path} =~ m!\Q$dir/$rest!) {
-		    print "$c->{path}\n";
-		    print "$c->{path}/\n"if $c->{children};
+		    push @$res, $c->{path};
+		    push @$res, "$c->{path}/" if $c->{children};
 		}
 	    }
 	}
     }
+    return $res;
+}
+
+# test for command lines with api calls (or similar bash completion calls):
+# example1: pveclient api get remote1 /cluster
+sub extract_path_info {
+
+    my $info;
+
+    my $test_path_properties = sub {
+	my ($args) = @_;
+
+	return if scalar(@$args) < 5;
+	return if $args->[1] ne 'api';
+
+	my $path = $args->[4];
+	if (my $method = $method_map->{$args->[2]}) {
+	    $info = lookup_api_method($path, $method, 1);
+	}
+    };
+
+    if (defined(my $cmd = $ARGV[0])) {
+	if ($cmd eq 'api') {
+	    $test_path_properties->([$0, @ARGV]);
+	} elsif ($cmd eq 'bashcomplete') {
+	    my $cmdline = substr($ENV{COMP_LINE}, 0, $ENV{COMP_POINT});
+	    my $args = PVE::Tools::split_args($cmdline);
+	    $test_path_properties->($args);
+	}
+    }
+
+    return $info;
 }
 
 1;
