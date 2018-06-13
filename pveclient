@@ -161,7 +161,8 @@ our $cmddef = {
     list => $PVE::APIClient::Commands::list::cmddef,
     lxc => $PVE::APIClient::Commands::lxc::cmddef,
     remote => $PVE::APIClient::Commands::remote::cmddef,
-    
+
+    spice => [ 'PVE::APIClient::Commands::GuestStatus', 'spice', ['remote', 'vmid']],
     start => [ 'PVE::APIClient::Commands::GuestStatus', 'start', ['remote', 'vmid']],
     stop => [ 'PVE::APIClient::Commands::GuestStatus', 'stop', ['remote', 'vmid']],
 
