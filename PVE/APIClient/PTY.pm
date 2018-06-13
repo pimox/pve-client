@@ -1,4 +1,4 @@
-package PVE::PTY;
+package PVE::APIClient::PTY;
 
 use strict;
 use warnings;

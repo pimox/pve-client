@@ -43,8 +43,8 @@ __PACKAGE__->register_method ({
     code => sub {
 	my ($param) = @_;
 
-	my $remote = PVE::Tools::extract_param($param, 'remote');
-	my $vmid = PVE::Tools::extract_param($param, 'vmid');
+	my $remote = PVE::APIClient::Tools::extract_param($param, 'remote');
+	my $vmid = PVE::APIClient::Tools::extract_param($param, 'vmid');
 
 	$guest_status_command->($remote, $vmid, 'start', $param);
 
@@ -67,8 +67,8 @@ __PACKAGE__->register_method ({
     code => sub {
 	my ($param) = @_;
 
-	my $remote = PVE::Tools::extract_param($param, 'remote');
-	my $vmid = PVE::Tools::extract_param($param, 'vmid');
+	my $remote = PVE::APIClient::Tools::extract_param($param, 'remote');
+	my $vmid = PVE::APIClient::Tools::extract_param($param, 'vmid');
 
 	$guest_status_command->($remote, $vmid, 'stop', $param);
 

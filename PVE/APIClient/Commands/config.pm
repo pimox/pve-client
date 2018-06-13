@@ -5,7 +5,7 @@ use warnings;
 use Data::Dumper;
 
 use PVE::JSONSchema qw(get_standard_option);
-use PVE::Tools qw(extract_param);
+use PVE::APIClient::Tools qw(extract_param);
 use PVE::APIClient::Config;
 
 use PVE::CLIHandler;
@@ -60,7 +60,7 @@ __PACKAGE__->register_method ({
 
 	if ($delete) {
 	    my $options = $plugin->private()->{options}->{'defaults'};
-	    foreach my $k (PVE::Tools::split_list($delete)) {
+	    foreach my $k (PVE::APIClient::Tools::split_list($delete)) {
 		my $d = $options->{$k} ||
 		    die "no such option '$k'\n";
 		die "unable to delete required option '$k'\n"

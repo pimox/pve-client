@@ -1,10 +1,10 @@
-package PVE::SectionConfig;
+package PVE::APIClient::SectionConfig;
 
 use strict;
 use warnings;
 use Digest::SHA;
-use PVE::Exception qw(raise_param_exc);
-use PVE::JSONSchema qw(get_standard_option);
+use PVE::APIClient::Exception qw(raise_param_exc);
+use PVE::APIClient::JSONSchema qw(get_standard_option);
 
 use Data::Dumper;
 
@@ -251,7 +251,7 @@ sub check_value {
 
     if (!$skipSchemaCheck) {
 	my $errors = {};
-	PVE::JSONSchema::check_prop($value, $schema, '', $errors);
+	PVE::APIClient::JSONSchema::check_prop($value, $schema, '', $errors);
 	if (scalar(keys %$errors)) {
 	    die "$errors->{$key}\n" if $errors->{$key};
 	    die "$errors->{_root}\n" if $errors->{_root};
@@ -491,7 +491,7 @@ sub write_config {
 sub assert_if_modified {
     my ($cfg, $digest) = @_;
 
-    PVE::Tools::assert_if_modified($cfg->{digest}, $digest);
+    PVE::APIClient::Tools::assert_if_modified($cfg->{digest}, $digest);
 }
 
 1;

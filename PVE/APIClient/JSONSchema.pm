@@ -1,4 +1,4 @@
-package PVE::JSONSchema;
+package PVE::APIClient::JSONSchema;
 
 use strict;
 use warnings;
@@ -7,8 +7,8 @@ use Getopt::Long;
 use Encode::Locale;
 use Encode;
 use Devel::Cycle -quiet; # todo: remove?
-use PVE::Tools qw(split_list $IPV6RE $IPV4RE);
-use PVE::Exception qw(raise);
+use PVE::APIClient::Tools qw(split_list $IPV6RE $IPV4RE);
+use PVE::APIClient::Exception qw(raise);
 use HTTP::Status qw(:constants);
 use Net::IP qw(:PROC);
 use Data::Dumper;
@@ -146,7 +146,7 @@ sub pve_verify_configid {
     return $id;
 }
 
-PVE::JSONSchema::register_format('pve-storage-id', \&parse_storage_id);
+PVE::APIClient::JSONSchema::register_format('pve-storage-id', \&parse_storage_id);
 sub parse_storage_id {
     my ($storeid, $noerr) = @_;
 
@@ -466,7 +466,7 @@ sub pve_parse_startup_order {
     return $res;
 }
 
-PVE::JSONSchema::register_standard_option('pve-startup-order', {
+PVE::APIClient::JSONSchema::register_standard_option('pve-startup-order', {
     description => "Startup and shutdown behavior. Order is a non-negative number defining the general startup order. Shutdown in done with reverse ordering. Additionally you can set the 'up' or 'down' delay in seconds, which specifies a delay to wait before the next VM is started or stopped.",
     optional => 1,
     type => 'string', format => 'pve-startup-order',

@@ -6,7 +6,7 @@ use JSON;
 
 use PVE::JSONSchema;
 use PVE::SectionConfig;
-use PVE::Tools qw(file_get_contents file_set_contents);
+use PVE::APIClient::Tools qw(file_get_contents file_set_contents);
 
 use base qw(PVE::SectionConfig);
 

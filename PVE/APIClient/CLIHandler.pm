@@ -1,13 +1,14 @@
-package PVE::CLIHandler;
+package PVE::APIClient::CLIHandler;
 
 use strict;
 use warnings;
 
-use PVE::SafeSyslog;
-use PVE::Exception qw(raise raise_param_exc);
-use PVE::RESTHandler;
+use PVE::APIClient::SafeSyslog;
+use PVE::APIClient::Exception qw(raise raise_param_exc);
+use PVE::APIClient::RESTHandler;
 
-use base qw(PVE::RESTHandler);
+
+use base qw(PVE::APIClient::RESTHandler);
 
 # $cmddef defines which (sub)commands are available in a specific CLI class.
 # A real command is always an array consisting of its class, name, array of
@@ -22,13 +23,13 @@ use base qw(PVE::RESTHandler);
 #
 # Examples:
 # $cmddef = {
-#     command => [ 'PVE::API2::Class', 'command', [ 'arg1', 'arg2' ], { node => $nodename } ],
+#     command => [ 'PVE::APIClient::API2::Class', 'command', [ 'arg1', 'arg2' ], { node => $nodename } ],
 #     do => {
-#         this => [ 'PVE::API2::OtherClass', 'method', [ 'arg1' ], undef, sub {
+#         this => [ 'PVE::APIClient::API2::OtherClass', 'method', [ 'arg1' ], undef, sub {
 #             my ($res) = @_;
 #             print "$res\n";
 #         }],
-#         that => [ 'PVE::API2::OtherClass', 'subroutine' [] ],
+#         that => [ 'PVE::APIClient::API2::OtherClass', 'subroutine' [] ],
 #     },
 #     dothat => { alias => 'do that' },
 # }
@@ -189,7 +190,7 @@ __PACKAGE__->register_method ({
     parameters => {
 	additionalProperties => 0,
 	properties => {
-	    'extra-args' => PVE::JSONSchema::get_standard_option('extra-args', {
+	    'extra-args' => PVE::APIClient::JSONSchema::get_standard_option('extra-args', {
 		description => 'Shows help for a specific command',
 		completion => $complete_command_names,
 	    }),
@@ -309,7 +310,7 @@ my $print_bash_completion = sub {
     my $cmdline = substr($ENV{COMP_LINE}, 0, $ENV{COMP_POINT});
     print STDERR "\nCMDLINE: $ENV{COMP_LINE}\n" if $debug;
 
-    my $args = PVE::Tools::split_args($cmdline);
+    my $args = PVE::APIClient::Tools::split_args($cmdline);
     shift @$args; # no need for program name
     my $print_result = sub {
 	foreach my $p (@_) {
@@ -400,7 +401,7 @@ sub verify_api {
     my ($class) = @_;
 
     # simply verify all registered methods
-    PVE::RESTHandler::validate_method_schemas();
+    PVE::APIClient::RESTHandler::validate_method_schemas();
 }
 
 my $get_exe_name = sub {
@@ -476,7 +477,7 @@ my $handle_cmd  = sub {
     # call verifyapi before setup_environment(), don't execute any real code in
     # this case
     if ($cmd eq 'verifyapi') {
-	PVE::RESTHandler::validate_method_schemas();
+	PVE::APIClient::RESTHandler::validate_method_schemas();
 	return;
     }
 
@@ -513,7 +514,7 @@ my $handle_simple_cmd = sub {
 	    print STDERR "$str\n\n";
 	    return;
 	} elsif ($args->[0] eq 'verifyapi') {
-	    PVE::RESTHandler::validate_method_schemas();
+	    PVE::APIClient::RESTHandler::validate_method_schemas();
 	    return;
 	}
     }

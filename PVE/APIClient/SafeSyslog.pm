@@ -1,4 +1,4 @@
-package PVE::SafeSyslog;
+package PVE::APIClient::SafeSyslog;
 
 use strict;
 use warnings;

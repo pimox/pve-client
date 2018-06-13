@@ -1,12 +1,12 @@
-package PVE::RESTHandler;
+package PVE::APIClient::RESTHandler;
 
 use strict;
 no strict 'refs'; # our autoload requires this
 use warnings;
-use PVE::SafeSyslog;
-use PVE::Exception qw(raise raise_param_exc);
-use PVE::JSONSchema;
-use PVE::Tools;
+use PVE::APIClient::SafeSyslog;
+use PVE::APIClient::Exception qw(raise raise_param_exc);
+use PVE::APIClient::JSONSchema;
+use PVE::APIClient::Tools;
 use HTTP::Status qw(:constants :is status_message);
 use Text::Wrap;
 use Clone qw(clone);
@@ -45,7 +45,7 @@ sub api_clone_schema {
 	    # NOTE: add typetext property for more complex types, to
 	    # make the web api viewer code simpler
 	    if (!(defined($tmp->{enum}) || defined($tmp->{pattern}))) {
-		my $typetext = PVE::JSONSchema::schema_get_type_text($tmp);
+		my $typetext = PVE::APIClient::JSONSchema::schema_get_type_text($tmp);
 		if ($tmp->{type} && ($tmp->{type} ne $typetext)) {
 		    $tmp->{typetext} = $typetext;
 		}
@@ -58,7 +58,7 @@ sub api_clone_schema {
 }
 
 sub api_dump_full {
-    my ($tree, $index, $class, $prefix) = @_;
+    my ($tree, $index, $class, $prefix, $raw_dump) = @_;
 
     $prefix = '' if !$prefix;
 
@@ -70,7 +70,7 @@ sub api_dump_full {
 	$path =~ s/\/+$//;
 
 	if ($info->{subclass}) {
-	    api_dump_full($tree, $index, $info->{subclass}, $path);
+	    api_dump_full($tree, $index, $info->{subclass}, $path, $raw_dump);
 	} else {
 	    next if !$path;
 
@@ -110,12 +110,15 @@ sub api_dump_full {
 			$k eq "path";
 
 		    my $d = $info->{$k};
-		    
-		    if ($k eq 'parameters') {
-			$data->{$k} = api_clone_schema($d);
-		    } else {
 
-			$data->{$k} = ref($d) ? clone($d) : $d;
+		    if ($raw_dump) {
+			$data->{$k} = $d;
+		    } else {
+			if ($k eq 'parameters') {
+			    $data->{$k} = api_clone_schema($d);
+			} else {
+			    $data->{$k} = ref($d) ? clone($d) : $d;
+			}
 		    }
 		} 
 		$res->{info}->{$info->{method}} = $data;
@@ -173,12 +176,12 @@ sub api_dump_remove_refs {
 }
 
 sub api_dump {
-    my ($class, $prefix) = @_;
+    my ($class, $prefix, $raw_dump) = @_;
 
     my $tree = [];
 
     my $index = {};
-    api_dump_full($tree, $index, $class);
+    api_dump_full($tree, $index, $class, $prefix, $raw_dump);
     api_dump_cleanup_tree($tree);
     return $tree;
 };
@@ -189,7 +192,7 @@ sub validate_method_schemas {
 	my $ma = $method_registry->{$class};
 
 	foreach my $info (@$ma) {
-	    PVE::JSONSchema::validate_method_info($info);
+	    PVE::APIClient::JSONSchema::validate_method_info($info);
 	}
     }
 }
@@ -402,7 +405,7 @@ sub handle {
 
     if (my $schema = $info->{parameters}) {
 	# warn "validate ". Dumper($param}) . "\n" . Dumper($schema);
-	PVE::JSONSchema::validate($param, $schema);
+	PVE::APIClient::JSONSchema::validate($param, $schema);
 	# untaint data (already validated)
 	my $extra = delete $param->{'extra-args'};
 	while (my ($key, $val) = each %$param) {
@@ -415,7 +418,7 @@ sub handle {
 
     # todo: this is only to be safe - disable?
     if (my $schema = $info->{returns}) {
-	PVE::JSONSchema::validate($result, $schema, "Result verification failed\n");
+	PVE::APIClient::JSONSchema::validate($result, $schema, "Result verification failed\n");
     }
 
     return $result;
@@ -444,7 +447,7 @@ my $get_property_description = sub {
 
     chomp $descr;
 
-    my $type_text = PVE::JSONSchema::schema_get_type_text($phash, $style);
+    my $type_text = PVE::APIClient::JSONSchema::schema_get_type_text($phash, $style);
 
     if ($hidepw && $name eq 'password') {
 	$type_text = '';
@@ -552,7 +555,7 @@ my $compute_param_mapping_hash = sub {
 	    ($name, $func, $desc, $interactive) = @$item;
 	} else {
 	    $name = $item;
-	    $func = sub { return PVE::Tools::file_get_contents($_[0]) };
+	    $func = sub { return PVE::APIClient::Tools::file_get_contents($_[0]) };
 	}
 	$desc //= '<filepath>';
 	$res->{$name} = { desc => $desc, func => $func, interactive => $interactive };
@@ -708,7 +711,7 @@ sub dump_properties {
 	next if !$prop_fmt;
 
 	if (ref($prop_fmt) ne 'HASH') {
-	    $prop_fmt = PVE::JSONSchema::get_format($prop_fmt);
+	    $prop_fmt = PVE::APIClient::JSONSchema::get_format($prop_fmt);
 	}
 
 	next if !(ref($prop_fmt) && (ref($prop_fmt) eq 'HASH'));
@@ -740,7 +743,7 @@ sub cli_handler {
     my $res;
     eval {
 	my $param_mapping_hash = $compute_param_mapping_hash->($param_mapping_func->($name)) if $param_mapping_func;
-	my $param = PVE::JSONSchema::get_options($info->{parameters}, $args, $arg_param, $fixed_param, $read_password_func, $param_mapping_hash);
+	my $param = PVE::APIClient::JSONSchema::get_options($info->{parameters}, $args, $arg_param, $fixed_param, $read_password_func, $param_mapping_hash);
 
 	if (defined($param_mapping_hash)) {
 	    &$replace_file_names_with_contents($param, $param_mapping_hash);
@@ -751,7 +754,7 @@ sub cli_handler {
     if (my $err = $@) {
 	my $ec = ref($err);
 
-	die $err if !$ec || $ec ne "PVE::Exception" || !$err->is_param_exc();
+	die $err if !$ec || $ec ne "PVE::APIClient::Exception" || !$err->is_param_exc();
 	
 	$err->{usage} = $self->usage_str($name, $prefix, $arg_param, $fixed_param, 'short', $read_password_func, $param_mapping_func);
 

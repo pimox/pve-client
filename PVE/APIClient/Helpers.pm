@@ -175,7 +175,7 @@ sub extract_path_info {
 	    $test_path_properties->([$0, @ARGV]);
 	} elsif ($cmd eq 'bashcomplete') {
 	    my $cmdline = substr($ENV{COMP_LINE}, 0, $ENV{COMP_POINT});
-	    my $args = PVE::Tools::split_args($cmdline);
+	    my $args = PVE::APIClient::Tools::split_args($cmdline);
 	    $test_path_properties->($args);
 	}
     }
