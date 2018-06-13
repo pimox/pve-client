@@ -19,6 +19,16 @@ PVE_COMMON_FILES=    		\
 	SafeSyslog.pm		\
 	SectionConfig.pm	\
 
+PVE_CLIENT_SOURCES=				\
+	PVE/APIClient/Tools.pm			\
+	PVE/APIClient/Helpers.pm		\
+	PVE/APIClient/Config.pm			\
+	PVE/APIClient/Commands/remote.pm	\
+	PVE/APIClient/Commands/config.pm	\
+	PVE/APIClient/Commands/lxc.pm		\
+	PVE/APIClient/Commands/list.pm		\
+	PVE/APIClient/Commands/GuestStatus.pm
+
 all: ${DEB}
 
 .PHONY: deb
@@ -34,14 +44,7 @@ install:  pve-api-definition.dat
 	# install library tools from pve-common
 	for i in ${PVE_COMMON_FILES}; do install -m 0644 PVE/APIClient/$$i ${PERL5_DIR}/PVE/APIClient; done
 	# install pveclient
-	install -D -m 0644 PVE/APIClient/Tools.pm ${PERL5_DIR}/PVE/APIClient/Tools.pm
-	install -D -m 0644 PVE/APIClient/Helpers.pm ${PERL5_DIR}/PVE/APIClient/Helpers.pm
-	install -D -m 0644 PVE/APIClient/Config.pm ${PERL5_DIR}/PVE/APIClient/Config.pm
-	install -D -m 0644 PVE/APIClient/Commands/remote.pm ${PERL5_DIR}/PVE/APIClient/Commands/remote.pm
-	install -D -m 0644 PVE/APIClient/Commands/lxc.pm ${PERL5_DIR}/PVE/APIClient/Commands/lxc.pm
-	install -D -m 0644 PVE/APIClient/Commands/config.pm ${PERL5_DIR}/PVE/APIClient/Commands/config.pm
-	install -D -m 0644 PVE/APIClient/Commands/list.pm ${PERL5_DIR}/PVE/APIClient/Commands/list.pm
-	install -D -m 0644 PVE/APIClient/Commands/GuestStatus.pm ${PERL5_DIR}/PVE/APIClient/Commands/GuestStatus.pm
+	for i in ${PVE_CLIENT_SOURCES}; do install -D -m 0644 $$i ${PERL5_DIR}/$$i; done
 	install -D -m 0644 pve-api-definition.dat ${LIB_DIR}/pve-api-definition.dat
 	install -D -m 0755 pveclient ${DESTDIR}/usr/bin/pveclient
 	install -D -m 0644 pveclient.bash-completion ${BASHCOMPLDIR}/pveclient
