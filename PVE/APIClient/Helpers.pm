@@ -43,6 +43,23 @@ $build_pve_api_path_hash = sub {
     }
 };
 
+my $default_output_format = 'table';
+my $client_output_format =  $default_output_format;
+
+sub set_output_format {
+    my ($format) = @_;
+
+    if (!defined($format)) {
+	$client_output_format =  $default_output_format;
+    } else {
+	$client_output_format =  $format;
+    }
+}
+
+sub get_output_format {
+    return $client_output_format;
+}
+
 sub get_api_definition {
 
     if (!defined($pve_api_definition)) {

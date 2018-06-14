@@ -21,10 +21,17 @@ use PVE::APIClient::Commands::GuestStatus;
 
 use JSON;
 
-sub call_method {
-    my ($remote, $path, $method, $param) = @_;
+sub call_api_method {
+    my ($method, $param) = @_;
 
+    my $path = PVE::APIClient::Tools::extract_param($param, 'api_path');
     die "missing API path\n" if !defined($path);
+
+    my $remote = PVE::APIClient::Tools::extract_param($param, 'remote');
+    die "missing remote\n" if !defined($remote);
+
+    my $format = PVE::APIClient::Tools::extract_param($param, 'format');
+    PVE::APIClient::Helpers::set_output_format($format);
 
     my $config = PVE::APIClient::Config->load();
 
@@ -76,6 +83,7 @@ if (my $info =  PVE::APIClient::Helpers::extract_path_info()) {
     $path_returns = $info->{returns};
 }
 
+$path_properties->{format} = get_standard_option('pveclient-output-format'),
 $path_properties->{remote} = get_standard_option('pveclient-remote-name');
 $path_properties->{api_path} = {
     description => "API path.",
@@ -86,8 +94,11 @@ $path_properties->{api_path} = {
     },
 };
 
+
 my $format_result = sub {
-    my ($data, $format) = @_;
+    my ($data) = @_;
+
+    my $format = PVE::APIClient::Helpers::get_output_format();
 
     return if $path_returns->{type} eq 'null';
 
@@ -108,10 +119,7 @@ __PACKAGE__->register_method ({
     code => sub {
 	my ($param) = @_;
 
-	my $path = PVE::Tools::extract_param($param, 'api_path');
-	my $remote = PVE::Tools::extract_param($param, 'remote');
-
-	return call_method($remote, $path, 'GET', $param);
+	return call_api_method('GET', $param);
     }});
 
 __PACKAGE__->register_method ({
@@ -127,10 +135,7 @@ __PACKAGE__->register_method ({
     code => sub {
 	my ($param) = @_;
 
-	print Dumper($param);
-
-	die "implement me";
-
+	return call_api_method('PUT', $param);
     }});
 
 __PACKAGE__->register_method ({
@@ -146,10 +151,7 @@ __PACKAGE__->register_method ({
     code => sub {
 	my ($param) = @_;
 
-	print Dumper($param);
-
-	die "implement me";
-
+	return call_api_method('PUSH', $param);
     }});
 
 __PACKAGE__->register_method ({
@@ -165,10 +167,7 @@ __PACKAGE__->register_method ({
     code => sub {
 	my ($param) = @_;
 
-	print Dumper($param);
-
-	die "implement me";
-
+	return call_api_method('DELETE', $param);
     }});
 
 
