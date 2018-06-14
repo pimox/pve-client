@@ -15,7 +15,7 @@ use PVE::APIClient::PTY;
 use base qw(PVE::APIClient::CLIHandler);
 
 sub read_password {
-   return PVE::PTY::read_password("Remote password: ")
+   return PVE::APIClient::PTY::read_password("Remote password: ")
 }
 
 __PACKAGE__->register_method ({
@@ -64,7 +64,7 @@ __PACKAGE__->register_method ({
 
 	my $password = $param->{password};
 	if (!defined($password)) {
-	    $password = PVE::PTY::read_password("Remote password: ");
+	    $password = PVE::APIClient::PTY::read_password("Remote password: ");
 	}
 
 	my $setup = {

@@ -247,12 +247,12 @@ __PACKAGE__->register_method ({
 	$full_write->($web_socket, $frame);
 
 	# Send resize command
-	my ($columns, $rows) = PVE::PTY::tcgetsize(*STDIN);
+	my ($columns, $rows) = PVE::APIClient::PTY::tcgetsize(*STDIN);
 	$frame = $create_websockt_frame->("1:$columns:$rows:");
 	$full_write->($web_socket, $frame);
 
 	# Set STDIN to "raw -echo" mode
-	my $old_termios = PVE::PTY::tcgetattr(*STDIN);
+	my $old_termios = PVE::APIClient::PTY::tcgetattr(*STDIN);
 	my $raw_termios = {%$old_termios};
 
 	my $read_select = IO::Select->new;
@@ -264,8 +264,8 @@ __PACKAGE__->register_method ({
 	eval {
 	    $SIG{TERM} = $SIG{INT} = $SIG{KILL} = sub { die "received interrupt\n"; };
 
-	    PVE::PTY::cfmakeraw($raw_termios);
-	    PVE::PTY::tcsetattr(*STDIN, $raw_termios);
+	    PVE::APIClient::PTY::cfmakeraw($raw_termios);
+	    PVE::APIClient::PTY::tcsetattr(*STDIN, $raw_termios);
 
 	    # And set it to non-blocking so we can every char with IO::Select.
 	    STDIN->blocking(0);
@@ -283,7 +283,7 @@ __PACKAGE__->register_method ({
 	    $SIG{WINCH} = sub { $winch_received = 1; };
 
 	    my $check_terminal_size = sub {
-		my ($ncols, $nrows) = PVE::PTY::tcgetsize(*STDIN);
+		my ($ncols, $nrows) = PVE::APIClient::PTY::tcgetsize(*STDIN);
 		if ($ncols != $columns or $nrows != $rows) {
 		    $columns = $ncols;
 		    $rows = $nrows;
@@ -406,7 +406,7 @@ __PACKAGE__->register_method ({
 	    $full_write->(\*STDOUT, $output_buffer);
 	    $output_buffer = '';
 
-	    PVE::PTY::tcsetattr(*STDIN, $old_termios);
+	    PVE::APIClient::PTY::tcsetattr(*STDIN, $old_termios);
 	};
 	warn $@ if $@; # show cleanup errors
 
