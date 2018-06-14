@@ -64,7 +64,8 @@ __PACKAGE__->register_method ({
 	    timeout => {
 		description => "Timeout in seconds",
 		type => 'integer',
-		minimum => 1
+		minimum => 1,
+		optional => 1,
 	    },
 	},
     },
@@ -98,7 +99,8 @@ __PACKAGE__->register_method ({
 	    timeout => {
 		description => "Timeout in seconds",
 		type => 'integer',
-		minimum => 1
+		minimum => 1,
+		optional => 1,
 	    },
 	},
     },
