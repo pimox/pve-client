@@ -4,7 +4,6 @@ use strict;
 use warnings;
 
 use PVE::APIClient::SafeSyslog;
-use PVE::APIClient::Exception qw(raise raise_param_exc);
 use PVE::APIClient::RESTHandler;
 
 
@@ -132,7 +131,7 @@ sub generate_usage_str {
 	$cli_handler_class->can('string_param_file_mapping');
 
     my ($subcmd, $def, undef, undef, $cmdstr) = resolve_cmd($cmd);
-    die "no such command '$cmd->[0]'\n" if !defined($def) && ref($cmd) eq 'ARRAY';
+    $abort->("unknown command '$cmdstr'") if !defined($def) && ref($cmd) eq 'ARRAY';
 
     my $generate;
     $generate = sub {
@@ -314,7 +313,7 @@ my $print_bash_completion = sub {
     shift @$args; # no need for program name
     my $print_result = sub {
 	foreach my $p (@_) {
-	    print "$p\n" if $p =~ m/^$cur/;
+	    print "$p\n" if $p =~ m/^\Q$cur\E/;
 	}
     };
 
