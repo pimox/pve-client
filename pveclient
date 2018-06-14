@@ -98,12 +98,7 @@ $path_properties->{api_path} = {
 my $format_result = sub {
     my ($data) = @_;
 
-    my $format = PVE::APIClient::Helpers::get_output_format();
-
-    return if $path_returns->{type} eq 'null';
-
-    # TODO: implement different output formats ($format)
-    print to_json($data, {utf8 => 1, allow_nonref => 1, canonical => 1, pretty => 1 });
+    PVE::APIClient::Helpers::print_result($data, $path_returns);
 };
 
 __PACKAGE__->register_method ({
