@@ -6,6 +6,9 @@ use JSON;
 
 use PVE::APIClient::JSONSchema qw(get_standard_option);
 
+use PVE::APIClient::Config;
+use PVE::APIClient::CLIHandler;
+
 use base qw(PVE::APIClient::CLIHandler);
 
 __PACKAGE__->register_method ({
