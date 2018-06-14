@@ -11,11 +11,11 @@ use MIME::Base64;
 use Digest::SHA;
 use HTTP::Response;
 
-use PVE::JSONSchema qw(get_standard_option);
-use PVE::CLIHandler;
-use PVE::PTY;
+use PVE::APIClient::JSONSchema qw(get_standard_option);
+use PVE::APIClient::CLIHandler;
+use PVE::APIClient::PTY;
 
-use base qw(PVE::CLIHandler);
+use base qw(PVE::APIClient::CLIHandler);
 use PVE::APIClient::Config;
 
 my $CRLF = "\x0D\x0A";

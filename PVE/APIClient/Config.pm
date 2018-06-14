@@ -4,11 +4,11 @@ use strict;
 use warnings;
 use JSON;
 
-use PVE::JSONSchema;
-use PVE::SectionConfig;
+use PVE::APIClient::JSONSchema;
+use PVE::APIClient::SectionConfig;
 use PVE::APIClient::Tools qw(file_get_contents file_set_contents);
 
-use base qw(PVE::SectionConfig);
+use base qw(PVE::APIClient::SectionConfig);
 
 my $remote_namne_regex = qw(\w+);
 
@@ -24,7 +24,7 @@ my $complete_remote_name = sub {
     return $list;
 };
 
-PVE::JSONSchema::register_standard_option('pveclient-remote-name', {
+PVE::APIClient::JSONSchema::register_standard_option('pveclient-remote-name', {
     description => "The name of the remote.",
     type => 'string',
     pattern => $remote_namne_regex,
@@ -158,8 +158,8 @@ package PVE::APIClient::RemoteConfig;
 use strict;
 use warnings;
 
-use PVE::JSONSchema qw(register_standard_option get_standard_option);
-use PVE::SectionConfig;
+use PVE::APIClient::JSONSchema qw(register_standard_option get_standard_option);
+use PVE::APIClient::SectionConfig;
 
 use base qw( PVE::APIClient::Config);
 
@@ -225,7 +225,7 @@ package PVE::APIClient::DefaultsConfig;
 use strict;
 use warnings;
 
-use PVE::JSONSchema qw(register_standard_option get_standard_option);
+use PVE::APIClient::JSONSchema qw(register_standard_option get_standard_option);
 
 use base qw( PVE::APIClient::Config);
 

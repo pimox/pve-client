@@ -4,13 +4,13 @@ use strict;
 use warnings;
 use Data::Dumper;
 
-use PVE::JSONSchema qw(get_standard_option);
+use PVE::APIClient::JSONSchema qw(get_standard_option);
 use PVE::APIClient::Tools qw(extract_param);
 use PVE::APIClient::Config;
 
-use PVE::CLIHandler;
+use PVE::APIClient::CLIHandler;
 
-use base qw(PVE::CLIHandler);
+use base qw(PVE::APIClient::CLIHandler);
 
 __PACKAGE__->register_method ({
     name => 'list',

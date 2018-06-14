@@ -7,8 +7,8 @@ use warnings;
 use Cwd 'abs_path';
 use Data::Dumper;
 
-use PVE::JSONSchema qw(register_standard_option get_standard_option);
-use PVE::CLIHandler;
+use PVE::APIClient::JSONSchema qw(register_standard_option get_standard_option);
+use PVE::APIClient::CLIHandler;
 
 use PVE::APIClient::LWP;
 use PVE::APIClient::Helpers;
@@ -31,7 +31,7 @@ sub call_method {
     die "implement me";
 }
 
-use base qw(PVE::CLIHandler);
+use base qw(PVE::APIClient::CLIHandler);
 
 my $cmd = $ARGV[0];
 

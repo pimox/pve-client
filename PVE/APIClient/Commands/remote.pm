@@ -3,16 +3,16 @@ package PVE::APIClient::Commands::remote;
 use strict;
 use warnings;
 
-use PVE::JSONSchema qw(get_standard_option);
+use PVE::APIClient::JSONSchema qw(get_standard_option);
 use PVE::APIClient::Tools qw(extract_param);
 use PVE::APIClient::Config;
 
-use PVE::CLIHandler;
+use PVE::APIClient::CLIHandler;
 
 use PVE::APIClient::LWP;
-use PVE::PTY ();
+use PVE::APIClient::PTY;
 
-use base qw(PVE::CLIHandler);
+use base qw(PVE::APIClient::CLIHandler);
 
 sub read_password {
    return PVE::PTY::read_password("Remote password: ")

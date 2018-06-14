@@ -6,13 +6,13 @@ use warnings;
 use PVE::APIClient::Helpers;
 use PVE::APIClient::Config;
 
-use PVE::JSONSchema qw(get_standard_option);
+use PVE::APIClient::JSONSchema qw(get_standard_option);
 
 use File::Temp qw(tempfile);
 
-use PVE::CLIHandler;
+use PVE::APIClient::CLIHandler;
 
-use base qw(PVE::CLIHandler);
+use base qw(PVE::APIClient::CLIHandler);
 
 my $guest_status_command = sub {
     my ($remote, $vmid, $cmd, $param) = @_,
