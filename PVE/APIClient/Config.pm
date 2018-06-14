@@ -6,6 +6,7 @@ use JSON;
 
 use PVE::APIClient::JSONSchema;
 use PVE::APIClient::SectionConfig;
+use PVE::APIClient::PTY;
 use PVE::APIClient::Tools qw(file_get_contents file_set_contents);
 
 use base qw(PVE::APIClient::SectionConfig);
@@ -143,7 +144,7 @@ sub remote_conn {
 
     my $password = $section->{password};
     if (!defined($password)) {
-	$password = PVE::PTY::read_password("Remote password: ")
+	$password = PVE::APIClient::PTY::read_password("Remote password: ")
     }
 
     my $conn = PVE::APIClient::LWP->new(
