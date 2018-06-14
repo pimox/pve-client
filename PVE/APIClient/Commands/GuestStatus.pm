@@ -61,6 +61,11 @@ __PACKAGE__->register_method ({
 	properties => {
 	    remote => get_standard_option('pveclient-remote-name'),
 	    vmid => get_standard_option('pve-vmid'),
+	    timeout => {
+		description => "Timeout in seconds",
+		type => 'integer',
+		minimum => 1
+	    },
 	},
     },
     returns => { type => 'null'},
@@ -71,6 +76,88 @@ __PACKAGE__->register_method ({
 	my $vmid = PVE::APIClient::Tools::extract_param($param, 'vmid');
 
 	$guest_status_command->($remote, $vmid, 'stop', $param);
+
+	return undef;
+    }});
+
+__PACKAGE__->register_method ({
+    name => 'shutdown',
+    path => 'shutdown',
+    method => 'POST',
+    description => "Stop a guest (VM/Container).",
+    parameters => {
+	additionalProperties => 0,
+	properties => {
+	    remote => get_standard_option('pveclient-remote-name'),
+	    vmid => get_standard_option('pve-vmid'),
+	    force => {
+		description => "Make sure the Container/VM stops.",
+		type => 'boolean',
+		optional => 1,
+	    },
+	    timeout => {
+		description => "Timeout in seconds",
+		type => 'integer',
+		minimum => 1
+	    },
+	},
+    },
+    returns => { type => 'null'},
+    code => sub {
+	my ($param) = @_;
+
+	my $remote = PVE::APIClient::Tools::extract_param($param, 'remote');
+	my $vmid = PVE::APIClient::Tools::extract_param($param, 'vmid');
+
+	$guest_status_command->($remote, $vmid, 'shutdown', $param);
+
+	return undef;
+    }});
+
+__PACKAGE__->register_method ({
+    name => 'suspend',
+    path => 'suspend',
+    method => 'POST',
+    description => "Suspend a guest VM.",
+    parameters => {
+	additionalProperties => 0,
+	properties => {
+	    remote => get_standard_option('pveclient-remote-name'),
+	    vmid => get_standard_option('pve-vmid'),
+	},
+    },
+    returns => { type => 'null'},
+    code => sub {
+	my ($param) = @_;
+
+	my $remote = PVE::APIClient::Tools::extract_param($param, 'remote');
+	my $vmid = PVE::APIClient::Tools::extract_param($param, 'vmid');
+
+	$guest_status_command->($remote, $vmid, 'suspend', $param);
+
+	return undef;
+    }});
+
+__PACKAGE__->register_method ({
+    name => 'resume',
+    path => 'resume',
+    method => 'POST',
+    description => "Resume a guest VM.",
+    parameters => {
+	additionalProperties => 0,
+	properties => {
+	    remote => get_standard_option('pveclient-remote-name'),
+	    vmid => get_standard_option('pve-vmid'),
+	},
+    },
+    returns => { type => 'null'},
+    code => sub {
+	my ($param) = @_;
+
+	my $remote = PVE::APIClient::Tools::extract_param($param, 'remote');
+	my $vmid = PVE::APIClient::Tools::extract_param($param, 'vmid');
+
+	$guest_status_command->($remote, $vmid, 'resume', $param);
 
 	return undef;
     }});

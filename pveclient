@@ -178,9 +178,12 @@ our $cmddef = {
     lxc => $PVE::APIClient::Commands::lxc::cmddef,
     remote => $PVE::APIClient::Commands::remote::cmddef,
 
+    resume => [ 'PVE::APIClient::Commands::GuestStatus', 'resume', ['remote', 'vmid']],
+    shutdown => [ 'PVE::APIClient::Commands::GuestStatus', 'shutdown', ['remote', 'vmid']],
     spice => [ 'PVE::APIClient::Commands::GuestStatus', 'spice', ['remote', 'vmid']],
     start => [ 'PVE::APIClient::Commands::GuestStatus', 'start', ['remote', 'vmid']],
     stop => [ 'PVE::APIClient::Commands::GuestStatus', 'stop', ['remote', 'vmid']],
+    suspend => [ 'PVE::APIClient::Commands::GuestStatus', 'suspend', ['remote', 'vmid']],
 
     api => {
 	get => [ __PACKAGE__, 'pveclient_get', ['remote', 'api_path'], {}, $format_result ],
