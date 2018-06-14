@@ -31,7 +31,7 @@ __PACKAGE__->register_method ({
 	my $conn = PVE::APIClient::Config->remote_conn($config, $param->{remote});
 	my $resources = $conn->get('api2/json/cluster/resources', { type => 'vm' });
 
-	if (!defined($param->{format}) or $param->{format} eq 'table') {
+	if (!defined($param->{format}) or $param->{format} eq 'text') {
 	    my $headers = ['Node', 'VMID', 'Type', 'Name', 'Status'];
 	    my $data = [];
 	    for my $el (@$resources) {

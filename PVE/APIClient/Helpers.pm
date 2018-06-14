@@ -43,7 +43,7 @@ $build_pve_api_path_hash = sub {
     }
 };
 
-my $default_output_format = 'table';
+my $default_output_format = 'text';
 my $client_output_format =  $default_output_format;
 
 sub set_output_format {
@@ -71,7 +71,7 @@ sub print_result {
 
     if ($format eq 'json') {
 	print to_json($data, {utf8 => 1, allow_nonref => 1, canonical => 1, pretty => 1 });
-    } elsif ($format eq 'table') {
+    } elsif ($format eq 'text') {
 	my $type = $result_schema->{type};
 	if ($type eq 'object') {
 	    die "implement me";
