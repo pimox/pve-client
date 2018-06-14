@@ -9,6 +9,7 @@ use Data::Dumper;
 
 use PVE::APIClient::JSONSchema qw(register_standard_option get_standard_option);
 use PVE::APIClient::CLIHandler;
+use PVE::APIClient::PTY;
 
 use PVE::APIClient::LWP;
 use PVE::APIClient::Helpers;
@@ -48,6 +49,11 @@ sub call_api_method {
 }
 
 use base qw(PVE::APIClient::CLIHandler);
+
+sub read_password {
+   return PVE::APIClient::PTY::read_password("Remote password: ")
+}
+
 
 my $cmd = $ARGV[0];
 
