@@ -61,12 +61,6 @@ __PACKAGE__->register_method ({
 	properties => {
 	    remote => get_standard_option('pveclient-remote-name'),
 	    vmid => get_standard_option('pve-vmid'),
-	    timeout => {
-		description => "Timeout in seconds",
-		type => 'integer',
-		minimum => 1,
-		optional => 1,
-	    },
 	},
     },
     returns => { type => 'null'},
