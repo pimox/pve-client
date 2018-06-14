@@ -12,6 +12,7 @@ use PVE::APIClient::CLIHandler;
 
 use PVE::APIClient::LWP;
 use PVE::APIClient::Helpers;
+use PVE::APIClient::Config;
 use PVE::APIClient::Commands::config;
 use PVE::APIClient::Commands::remote;
 use PVE::APIClient::Commands::list;
@@ -21,14 +22,22 @@ use PVE::APIClient::Commands::GuestStatus;
 use JSON;
 
 sub call_method {
-    my ($remote, $path, $method, $params) = @_;
+    my ($remote, $path, $method, $param) = @_;
 
     die "missing API path\n" if !defined($path);
 
-    my $info = PVE::APIClient::Helpers::lookup_api_method($path, $method);
-    print Dumper($params);
+    my $config = PVE::APIClient::Config->load();
 
-    die "implement me";
+    # test if api path exists
+    my $info = PVE::APIClient::Helpers::lookup_api_method($path, $method);
+
+    my $conn = PVE::APIClient::Config->remote_conn($config, $remote);
+
+    my $res = $conn->call($method, "api2/json/$path", $param);
+    die "undefined result" if !defined($res);
+    die "undefined result data" if !exists($res->{data});
+
+    return $res->{data};
 }
 
 use base qw(PVE::APIClient::CLIHandler);
@@ -75,6 +84,15 @@ $path_properties->{api_path} = {
 	my ($cmd, $pname, $cur, $args) = @_;
 	return PVE::APIClient::Helpers::complete_api_path($cur);
     },
+};
+
+my $format_result = sub {
+    my ($data, $format) = @_;
+
+    return if $path_returns->{type} eq 'null';
+
+    # TODO: implement different output formats ($format)
+    print to_json($data, {utf8 => 1, allow_nonref => 1, canonical => 1, pretty => 1 });
 };
 
 __PACKAGE__->register_method ({
@@ -165,11 +183,11 @@ our $cmddef = {
     stop => [ 'PVE::APIClient::Commands::GuestStatus', 'stop', ['remote', 'vmid']],
 
     api => {
-	get => [ __PACKAGE__, 'pveclient_get', ['remote', 'api_path']],
-	set => [ __PACKAGE__, 'pveclient_set', ['remote', 'api_path']],
-	create => [ __PACKAGE__, 'pveclient_create', ['remote', 'api_path']],
-	delete => [ __PACKAGE__, 'pveclient_delete', ['remote', 'api_path']],
-    }
+	get => [ __PACKAGE__, 'pveclient_get', ['remote', 'api_path'], {}, $format_result ],
+	set => [ __PACKAGE__, 'pveclient_set', ['remote', 'api_path'], {}, $format_result ],
+	create => [ __PACKAGE__, 'pveclient_create', ['remote', 'api_path'], {}, $format_result ],
+	delete => [ __PACKAGE__, 'pveclient_delete', ['remote', 'api_path'], {}, $format_result ],
+    },
 };
 
 
