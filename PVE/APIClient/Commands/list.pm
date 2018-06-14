@@ -20,13 +20,7 @@ __PACKAGE__->register_method ({
 	additionalProperties => 0,
 	properties => {
 	    remote => get_standard_option('pveclient-remote-name'),
-	    format => {
-		type => 'string',
-		description => 'Output format',
-		enum => [ 'table', 'json' ],
-		optional => 1,
-		default => 'table',
-	    }
+	    format => get_standard_option('pveclient-output-format'),
 	},
     },
     returns => { type => 'null'},
