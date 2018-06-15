@@ -3,7 +3,10 @@ package PVE::APIClient::Config;
 use strict;
 use warnings;
 use JSON;
+use File::Basename qw(dirname);
+use File::Path qw(make_path);
 
+use PVE::APIClient::Helpers;
 use PVE::APIClient::JSONSchema;
 use PVE::APIClient::SectionConfig;
 use PVE::APIClient::PTY;
@@ -56,11 +59,9 @@ sub private {
 sub config_filename {
     my ($class) = @_;
 
-    my $home = $ENV{HOME};
+    my $dir = PVE::APIClient::Helpers::configuration_directory();
 
-    die "environment HOME not set\n" if !defined($home);
-
-    return "$home/.pveclient";
+    return "$dir/config";
 }
 
 sub format_section_header {
@@ -112,6 +113,8 @@ sub save {
     my ($class, $cfg) = @_;
 
     my $filename = $class->config_filename();
+
+    make_path(dirname($filename));
 
     $cfg->{order}->{$defaults_section} = -1; # write as first section
     my $raw = $class->write_config($filename, $cfg);
