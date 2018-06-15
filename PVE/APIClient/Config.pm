@@ -64,6 +64,18 @@ sub config_filename {
     return "$dir/config";
 }
 
+sub lock_config {
+    my ($class, $timeout, $code, @param) = @_;
+
+    my $filename = $class->config_filename();
+
+    my $res = PVE::APIClient::Tools::lock_file($filename, $timeout, $code, @param);
+
+    die $@ if $@;
+
+    return $res;
+}
+
 sub format_section_header {
     my ($class, $type, $sectionId, $scfg, $done_hash) = @_;
 

@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 
+use PVE::APIClient::Helpers;
 use PVE::APIClient::JSONSchema qw(get_standard_option);
 use PVE::APIClient::Tools qw(extract_param);
 use PVE::APIClient::Config;
@@ -24,12 +25,12 @@ __PACKAGE__->register_method ({
     code => sub {
 
 	my $config = PVE::APIClient::Config->load();
-	
+
 	my $defaults = PVE::APIClient::Config->get_defaults($config);
 
-	
+
 	print Dumper($config);
-	
+
 	return undef;
     }});
 
@@ -43,35 +44,37 @@ __PACKAGE__->register_method ({
     code => sub {
 	my ($param) = @_;
 
-	# fixme: lock config file
-
 	my $digest = extract_param($param, 'digest');
 	my $delete = extract_param($param, 'delete');
 
-	my $config = PVE::APIClient::Config->load();
-	my $defaults = PVE::APIClient::Config->get_defaults($config);
-	
-	my $plugin = PVE::APIClient::Config->lookup('defaults');
-	my $opts = $plugin->check_config('defaults', $param, 0, 1);
+	my $code = sub {
+	    my $config = PVE::APIClient::Config->load();
+	    my $defaults = PVE::APIClient::Config->get_defaults($config);
 
-	foreach my $k (%$opts) {
-	    $defaults->{$k} = $opts->{$k};
-	}
+	    my $plugin = PVE::APIClient::Config->lookup('defaults');
+	    my $opts = $plugin->check_config('defaults', $param, 0, 1);
 
-	if ($delete) {
-	    my $options = $plugin->private()->{options}->{'defaults'};
-	    foreach my $k (PVE::APIClient::Tools::split_list($delete)) {
-		my $d = $options->{$k} ||
-		    die "no such option '$k'\n";
-		die "unable to delete required option '$k'\n"
-		    if !$d->{optional};
-		die "unable to delete fixed option '$k'\n"
-		    if $d->{fixed};
-		delete $defaults->{$k};
+	    foreach my $k (%$opts) {
+		$defaults->{$k} = $opts->{$k};
 	    }
-	}
 
-	PVE::APIClient::Config->save($config);
+	    if ($delete) {
+		my $options = $plugin->private()->{options}->{'defaults'};
+		foreach my $k (PVE::APIClient::Tools::split_list($delete)) {
+		    my $d = $options->{$k} ||
+			die "no such option '$k'\n";
+		    die "unable to delete required option '$k'\n"
+			if !$d->{optional};
+		    die "unable to delete fixed option '$k'\n"
+			if $d->{fixed};
+		    delete $defaults->{$k};
+		}
+	    }
+
+	    PVE::APIClient::Config->save($config);
+	};
+
+	PVE::APIClient::Config->lock_config(undef, $code);
 
 	return undef;
     }});

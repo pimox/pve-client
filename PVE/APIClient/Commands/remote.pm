@@ -3,6 +3,7 @@ package PVE::APIClient::Commands::remote;
 use strict;
 use warnings;
 
+use PVE::APIClient::Helpers;
 use PVE::APIClient::JSONSchema qw(get_standard_option);
 use PVE::APIClient::Tools qw(extract_param);
 use PVE::APIClient::Config;
@@ -51,10 +52,9 @@ __PACKAGE__->register_method ({
     code => sub {
 	my ($param) = @_;
 
-	# fixme: lock config file
-
 	my $remote = $param->{name};
 
+	# Note: we try to keep lock time sort, and lock later when we have all info
 	my $config = PVE::APIClient::Config->load();
 
 	die "Remote '$remote' already exists\n"
@@ -90,11 +90,25 @@ __PACKAGE__->register_method ({
 	$api->login();
 
 	$param->{fingerprint} = $last_fp if !defined($param->{fingerprint});
-	my $plugin = PVE::APIClient::Config->lookup('remote');
-	my $opts = $plugin->check_config($remote, $param, 1, 1);
-	$config->{ids}->{$remote} = $opts;
 
-	PVE::APIClient::Config->save($config);
+	my $plugin = PVE::APIClient::Config->lookup('remote');
+
+	my $code = sub {
+
+	    $config = PVE::APIClient::Config->load(); # reload
+
+	    # check again (file is locked now)
+	    die "Remote '$remote' already exists\n"
+		if $config->{ids}->{$remote};
+
+	    my $opts = $plugin->check_config($remote, $param, 1, 1);
+
+	    $config->{ids}->{$remote} = $opts;
+
+	    PVE::APIClient::Config->save($config);
+	};
+
+	PVE::APIClient::Config->lock_config(undef, $code);
 
 	return undef;
     }});
@@ -109,36 +123,38 @@ __PACKAGE__->register_method ({
     code => sub {
 	my ($param) = @_;
 
-	# fixme: lock config file
-
 	my $name = extract_param($param, 'name');
 	my $digest = extract_param($param, 'digest');
 	my $delete = extract_param($param, 'delete');
 
-	my $config = PVE::APIClient::Config->load();
-	my $remote = PVE::APIClient::Config->lookup_remote($config, $name);
+	my $code = sub {
+	    my $config = PVE::APIClient::Config->load();
+	    my $remote = PVE::APIClient::Config->lookup_remote($config, $name);
 
-	my $plugin = PVE::APIClient::Config->lookup('remote');
-	my $opts = $plugin->check_config($name, $param, 0, 1);
+	    my $plugin = PVE::APIClient::Config->lookup('remote');
+	    my $opts = $plugin->check_config($name, $param, 0, 1);
 
-	foreach my $k (%$opts) {
-	    $remote->{$k} = $opts->{$k};
-	}
-
-	if ($delete) {
-	    my $options = $plugin->private()->{options}->{'remote'};
-	    foreach my $k (PVE::APIClient::Tools::APIClient::split_list($delete)) {
-		my $d = $options->{$k} ||
-		    die "no such option '$k'\n";
-		die "unable to delete required option '$k'\n"
-		    if !$d->{optional};
-		die "unable to delete fixed option '$k'\n"
-		    if $d->{fixed};
-		delete $remote->{$k};
+	    foreach my $k (%$opts) {
+		$remote->{$k} = $opts->{$k};
 	    }
-	}
 
-	PVE::APIClient::Config->save($config);
+	    if ($delete) {
+		my $options = $plugin->private()->{options}->{'remote'};
+		foreach my $k (PVE::APIClient::Tools::APIClient::split_list($delete)) {
+		    my $d = $options->{$k} ||
+			die "no such option '$k'\n";
+		    die "unable to delete required option '$k'\n"
+			if !$d->{optional};
+		    die "unable to delete fixed option '$k'\n"
+			if $d->{fixed};
+		    delete $remote->{$k};
+		}
+	    }
+
+	    PVE::APIClient::Config->save($config);
+	};
+
+	PVE::APIClient::Config->lock_config(undef, $code);
 
 	return undef;
     }});
@@ -158,11 +174,13 @@ __PACKAGE__->register_method ({
     code => sub {
 	my ($param) = @_;
 
-	# fixme: lock config
+	my $code = sub {
+	    my $config = PVE::APIClient::Config->load();
+	    delete $config->{ids}->{$param->{name}};
+	    PVE::APIClient::Config->save($config);
+	};
 
-	my $config = PVE::APIClient::Config->load();
-	delete $config->{ids}->{$param->{name}};
-	PVE::APIClient::Config->save($config);
+	PVE::APIClient::Config->lock_config(undef, $code);
 
 	return undef;
     }});
