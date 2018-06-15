@@ -145,22 +145,54 @@ sub remote_conn {
 
     my $section = $class->lookup_remote($cfg, $remote);
 
+    my $trylogin = sub {
+	my ($ticket_or_password) = @_;
+
+	if (!defined($ticket_or_password)) {
+	    $ticket_or_password = PVE::APIClient::PTY::read_password("Remote password: ")
+	}
+
+	my $setup = {
+	    username                => $section->{username},
+	    password                => $ticket_or_password,
+	    host                    => $section->{host},
+	    port                    => $section->{port} // 8006,
+	    cached_fingerprints     => {
+		$section->{fingerprint} => 1,
+	    }
+	};
+
+	my $conn = PVE::APIClient::LWP->new(%$setup);
+
+	$conn->login();
+
+	return $conn;
+    };
+
     my $password = $section->{password};
-    if (!defined($password)) {
-	$password = PVE::APIClient::PTY::read_password("Remote password: ")
+
+    my $conn;
+
+    if (defined($password)) {
+	$conn = $trylogin->($password);
+    } else {
+
+	if (my $ticket = PVE::APIClient::Helpers::ticket_cache_lookup($remote)) {
+	    eval { $conn = $trylogin->($ticket); };
+	    if (my $err = $@) {
+		PVE::APIClient::Helpers::ticket_cache_update($remote, undef);
+		if (ref($err) && (ref($err) eq 'PVE::APIClient::Exception') && ($err->{code} == 401)) {
+		    $conn = $trylogin->();
+		} else {
+		    die $err;
+		}
+	    }
+	} else {
+	    $conn = $trylogin->();
+	}
     }
 
-    my $conn = PVE::APIClient::LWP->new(
-	username                => $section->{username},
-	password                => $password,
-	host                    => $section->{host},
-	port                    => $section->{port} // 8006,
-	cached_fingerprints     => {
-	    $section->{fingerprint} => 1,
-	}
-    );
-
-    $conn->login;
+    PVE::APIClient::Helpers::ticket_cache_update($remote, $conn->{ticket});
 
     return $conn;
 }
