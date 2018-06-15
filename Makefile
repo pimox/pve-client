@@ -12,6 +12,8 @@ DOCDIR=${DESTDIR}/usr/share/doc/${PACKAGE}
 BASHCOMPLDIR=${DESTDIR}/usr/share/bash-completion/completions/
 
 PVE_COMMON_FILES=    		\
+	Tools.pm		\
+	Syscall.pm		\
 	CLIHandler.pm		\
 	JSONSchema.pm		\
 	PTY.pm			\
@@ -20,7 +22,6 @@ PVE_COMMON_FILES=    		\
 	SectionConfig.pm	\
 
 PVE_CLIENT_SOURCES=				\
-	PVE/APIClient/Tools.pm			\
 	PVE/APIClient/Helpers.pm		\
 	PVE/APIClient/Config.pm			\
 	PVE/APIClient/Commands/remote.pm	\

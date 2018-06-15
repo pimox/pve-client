@@ -3,6 +3,7 @@ package PVE::APIClient::SectionConfig;
 use strict;
 use warnings;
 use Digest::SHA;
+use PVE::APIClient::Exception qw(raise_param_exc);
 use PVE::APIClient::JSONSchema qw(get_standard_option);
 
 use Data::Dumper;

@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use PVE::APIClient::SafeSyslog;
+use PVE::APIClient::Exception qw(raise raise_param_exc);
 use PVE::APIClient::RESTHandler;
 
 
@@ -53,7 +54,9 @@ my $expand_command_name = sub {
 
     return $cmd if exists $def->{$cmd}; # command is already complete
 
-    my @expanded = grep { /^\Q$cmd\E/ } keys %$def;
+    my $is_alias = sub { ref($_[0]) eq 'HASH' && exists($_[0]->{alias}) };
+    my @expanded = grep { /^\Q$cmd\E/ && !$is_alias->($def->{$_}) } keys %$def;
+
     return $expanded[0] if scalar(@expanded) == 1; # enforce exact match
 
     return undef;
@@ -488,7 +491,7 @@ my $handle_cmd  = sub {
     }
 
     # checked special commands, if def is still a hash we got an incomplete sub command
-    $abort->("incomplete command '$cmd_str'") if ref($def) eq 'HASH';
+    $abort->("incomplete command '$cmd_str'", $args) if ref($def) eq 'HASH';
 
     &$preparefunc() if $preparefunc;
 

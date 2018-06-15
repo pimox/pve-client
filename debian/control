@@ -10,6 +10,11 @@ Homepage: http://www.proxmox.com
 Package: pve-client
 Architecture: all
 Depends: libpve-apiclient-perl,
+	 libclone-perl,
+	 libdevel-cycle-perl,
+	 libnet-ip-perl,
+	 libfilesys-df-perl,
+	 libstring-shellquote-perl,
          ${misc:Depends},
 Description: Proxmox VE API client
  This implements an API client for Proxmox VE in perl.

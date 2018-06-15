@@ -4,7 +4,7 @@ use strict;
 no strict 'refs'; # our autoload requires this
 use warnings;
 use PVE::APIClient::SafeSyslog;
-use PVE::APIClient::Exception qw(raise);
+use PVE::APIClient::Exception qw(raise raise_param_exc);
 use PVE::APIClient::JSONSchema;
 use PVE::APIClient::Tools;
 use HTTP::Status qw(:constants :is status_message);
