@@ -7,6 +7,8 @@ use base 'Exporter';
 
 use IO::File;
 use Text::ParseWords;
+use Fcntl qw(:DEFAULT :flock);
+use Scalar::Util 'weaken';
 
 our @EXPORT_OK = qw(
 $IPV6RE
@@ -34,6 +36,131 @@ our $IPV6RE = "(?:" .
     "(?:(?:(?:(?:$IPV6H16:){0,6}$IPV6H16)?::" .                    ")))";
 
 our $IPRE = "(?:$IPV4RE|$IPV6RE)";
+
+sub run_with_timeout {
+    my ($timeout, $code, @param) = @_;
+
+    die "got timeout\n" if $timeout <= 0;
+
+    my $prev_alarm = alarm 0; # suspend outer alarm early
+
+    my $sigcount = 0;
+
+    my $res;
+
+    eval {
+	local $SIG{ALRM} = sub { $sigcount++; die "got timeout\n"; };
+	local $SIG{PIPE} = sub { $sigcount++; die "broken pipe\n" };
+	local $SIG{__DIE__};   # see SA bug 4631
+
+	alarm($timeout);
+
+	eval { $res = &$code(@param); };
+
+	alarm(0); # avoid race conditions
+
+	die $@ if $@;
+    };
+
+    my $err = $@;
+
+    alarm $prev_alarm;
+
+    # this shouldn't happen anymore?
+    die "unknown error" if $sigcount && !$err; # seems to happen sometimes
+
+    die $err if $err;
+
+    return $res;
+}
+
+# flock: we use one file handle per process, so lock file
+# can be nested multiple times and succeeds for the same process.
+#
+# Since this is the only way we lock now and we don't have the old
+# 'lock(); code(); unlock();' pattern anymore we do not actually need to
+# count how deep we're nesting. Therefore this hash now stores a weak reference
+# to a boolean telling us whether we already have a lock.
+
+my $lock_handles =  {};
+
+sub lock_file_full {
+    my ($filename, $timeout, $shared, $code, @param) = @_;
+
+    $timeout = 10 if !$timeout;
+
+    my $mode = $shared ? LOCK_SH : LOCK_EX;
+
+    my $lockhash = ($lock_handles->{$$} //= {});
+
+    # Returns a locked file handle.
+    my $get_locked_file = sub {
+	my $fh = IO::File->new(">>$filename")
+	    or die "can't open file - $!\n";
+
+	if (!flock($fh, $mode|LOCK_NB)) {
+	    print STDERR "trying to acquire lock...\n";
+	    my $success;
+	    while(1) {
+		$success = flock($fh, $mode);
+		# try again on EINTR (see bug #273)
+		if ($success || ($! != EINTR)) {
+		    last;
+		}
+	    }
+	    if (!$success) {
+		print STDERR " failed\n";
+		die "can't acquire lock '$filename' - $!\n";
+	    }
+	    print STDERR " OK\n";
+	}
+
+	return $fh;
+    };
+
+    my $res;
+    my $checkptr = $lockhash->{$filename};
+    my $check = 0; # This must not go out of scope before running the code.
+    my $local_fh; # This must stay local
+    if (!$checkptr || !$$checkptr) {
+	# We cannot create a weak reference in a single atomic step, so we first
+	# create a false-value, then create a reference to it, then weaken it,
+	# and after successfully locking the file we change the boolean value.
+	#
+	# The reason for this is that if an outer SIGALRM throws an exception
+	# between creating the reference and weakening it, a subsequent call to
+	# lock_file_full() will see a leftover full reference to a valid
+	# variable. This variable must be 0 in order for said call to attempt to
+	# lock the file anew.
+	#
+	# An externally triggered exception elsewhere in the code will cause the
+	# weak reference to become 'undef', and since the file handle is only
+	# stored in the local scope in $local_fh, the file will be closed by
+	# perl's cleanup routines as well.
+	#
+	# This still assumes that an IO::File handle can properly deal with such
+	# exceptions thrown during its own destruction, but that's up to perls
+	# guts now.
+	$lockhash->{$filename} = \$check;
+	weaken $lockhash->{$filename};
+	$local_fh = eval { run_with_timeout($timeout, $get_locked_file) };
+	if ($@) {
+	    $@ = "can't lock file '$filename' - $@";
+	    return undef;
+	}
+	$check = 1;
+    }
+    $res = eval { &$code(@param); };
+    return undef if $@;
+    return $res;
+}
+
+
+sub lock_file {
+    my ($filename, $timeout, $code, @param) = @_;
+
+    return lock_file_full($filename, $timeout, 0, $code, @param);
+}
 
 sub file_set_contents {
     my ($filename, $data, $perm)  = @_;
