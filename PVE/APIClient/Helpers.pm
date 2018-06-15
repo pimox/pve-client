@@ -5,6 +5,8 @@ use warnings;
 
 use Storable;
 use JSON;
+use File::Path qw(make_path);
+
 use PVE::APIClient::Exception qw(raise);
 use Encode::Locale;
 use Encode;
@@ -286,5 +288,58 @@ sub configuration_directory {
 
     die "neither XDG_CONFIG_HOME nor HOME environment variable set\n";
 }
+
+my $ticket_cache_filename = "/.tickets";
+
+sub ticket_cache_lookup {
+    my ($remote) = @_;
+
+    my $dir = configuration_directory();
+    my $filename = "$dir/$ticket_cache_filename";
+
+    my $data = {};
+    eval { $data = from_json(PVE::APIClient::Tools::file_get_contents($filename)); };
+    # ignore errors
+
+    my $ticket = $data->{$remote};
+    return undef if !defined($ticket);
+
+    my $min_age = - 60;
+    my $max_age = 3600*2 - 60;
+
+    if ($ticket =~ m/:([a-fA-F0-9]{8})::/) {
+	my $ttime = hex($1);
+	my $ctime = time();
+	my $age = $ctime - $ttime;
+
+	return $ticket if ($age > $min_age) && ($age < $max_age);
+    }
+
+    return undef;
+}
+
+sub ticket_cache_update {
+    my ($remote, $ticket) = @_;
+
+    my $dir = configuration_directory();
+    my $filename = "$dir/$ticket_cache_filename";
+
+    my $code = sub {
+	make_path($dir);
+	my $data = {};
+	if (-f $filename) {
+	    my $raw = PVE::APIClient::Tools::file_get_contents($filename);
+	    eval { $data = from_json($raw); };
+	    # ignore errors
+	}
+	$data->{$remote} = $ticket;
+
+	PVE::APIClient::Tools::file_set_contents($filename, to_json($data), 0600);
+    };
+
+    PVE::APIClient::Tools::lock_file($filename, undef, $code);
+    die $@ if $@;
+}
+
 
 1;
