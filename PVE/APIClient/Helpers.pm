@@ -273,4 +273,18 @@ sub poll_task {
     return $task_status->{exitstatus};
 }
 
+sub configuration_directory {
+
+    my $home = $ENV{HOME} // '';
+    my $xdg = $ENV{XDG_CONFIG_HOME} // '';
+
+    my $subdir = "pveclient";
+
+    return "$xdg/$subdir" if length($xdg);
+
+    return "$home/.config/$subdir" if length($home);
+
+    die "neither XDG_CONFIG_HOME nor HOME environment variable set\n";
+}
+
 1;
