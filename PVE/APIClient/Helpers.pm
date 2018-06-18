@@ -7,6 +7,7 @@ use Storable;
 use JSON;
 use File::Path qw(make_path);
 
+use PVE::APIClient::JSONSchema;
 use PVE::APIClient::Exception qw(raise);
 use Encode::Locale;
 use Encode;
@@ -74,12 +75,57 @@ sub print_result {
     }
 }
 
+
+my $__real_remove_formats; $__real_remove_formats = sub {
+    my ($properties) = @_;
+
+    foreach my $pname (keys %$properties) {
+	if (my $d = $properties->{$pname}) {
+	    if (defined(my $format = $d->{format})) {
+		if (ref($format)) {
+		    $__real_remove_formats->($format);
+		} elsif (!PVE::APIClient::JSONSchema::get_format($format)) {
+		    # simply remove unknown format definitions
+		    delete $d->{format};
+		}
+	    }
+	}
+    }
+};
+
+my $remove_unknown_formats; $remove_unknown_formats = sub {
+    my ($tree) = @_;
+
+    my $class = ref($tree);
+    return if !$class;
+
+    if ($class eq 'ARRAY') {
+       foreach my $el (@$tree) {
+	   $remove_unknown_formats->($el);
+       }
+    } elsif ($class eq 'HASH') {
+	if (my $info = $tree->{info}) {
+	    for my $method (qw(GET PUT PUSH DELETE)) {
+		next if !$info->{$method};
+		my $properties = $info->{$method}->{parameters}->{properties};
+		$__real_remove_formats->($properties) if $properties;
+	    }
+	}
+	if ($tree->{children}) {
+	    $remove_unknown_formats->($tree->{children});
+	}
+    }
+    return;
+};
+
 sub get_api_definition {
 
     if (!defined($pve_api_definition)) {
 	open(my $fh, '<',  $pve_api_definition_fn) ||
 	    die "unable to open '$pve_api_definition_fn' - $!\n";
 	$pve_api_definition = Storable::fd_retrieve($fh);
+
+	$remove_unknown_formats->($pve_api_definition);
     }
 
     return $pve_api_definition;
