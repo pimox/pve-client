@@ -8,6 +8,7 @@ DESTDIR=
 
 PERL5_DIR=${DESTDIR}/usr/share/perl5
 LIB_DIR=${DESTDIR}/usr/share/${PACKAGE}
+MAN1DIR=${DESTDIR}//usr/share/man/man1
 DOCDIR=${DESTDIR}/usr/share/doc/${PACKAGE}
 BASHCOMPLDIR=${DESTDIR}/usr/share/bash-completion/completions/
 
@@ -40,7 +41,14 @@ deb ${DEB}:
 	cd build; dpkg-buildpackage -rfakeroot -b -us -uc
 	lintian ${DEB}
 
-install:  pve-api-definition.dat
+pveclient.1-synopsis.adoc: pveclient ${PVE_CLIENT_SOURCES}
+	perl -I. ./pveclient printsynopsis > $@.tmp
+	mv $@.tmp $@
+
+pveclient.1: pveclient.1-synopsis.adoc
+	a2x -f manpage pveclient.adoc
+
+install:  pve-api-definition.dat pveclient.1
 	install -d -m 0755 ${PERL5_DIR}/PVE/APIClient
 	# install library tools from pve-common
 	for i in ${PVE_COMMON_FILES}; do install -m 0644 PVE/APIClient/$$i ${PERL5_DIR}/PVE/APIClient; done
@@ -49,7 +57,9 @@ install:  pve-api-definition.dat
 	install -D -m 0644 pve-api-definition.dat ${LIB_DIR}/pve-api-definition.dat
 	install -D -m 0755 pveclient ${DESTDIR}/usr/bin/pveclient
 	install -D -m 0644 pveclient.bash-completion ${BASHCOMPLDIR}/pveclient
-
+	# install manual page
+	install -D -m 0644 pveclient.1 ${MAN1DIR}/pveclient.1
+	gzip -9 ${MAN1DIR}/pveclient.1
 
 update-pve-common:
 	for i in ${PVE_COMMON_FILES}; do cp ../pve-common/src/PVE/$$i PVE/APIClient/; done
@@ -70,6 +80,7 @@ distclean: clean
 
 clean:
 	rm -rf ./build *.deb *.changes *.buildinfo
+	rm pveclient.1-synopsis.adoc pveclient.1
 	find . -name '*~' -exec rm {} ';'
 
 .PHONY: dinstall

@@ -198,4 +198,11 @@ our $cmddef = {
 };
 
 
+if ($cmd && $cmd eq 'printsynopsis') {
+
+    print __PACKAGE__->generate_asciidoc_synopsis();
+
+    exit(0);
+}
+
 __PACKAGE__->run_cli_handler();
