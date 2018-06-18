@@ -36,8 +36,8 @@ sub call_api_method {
 
     my $config = PVE::APIClient::Config->load();
 
-    # test if api path exists
-    my $info = PVE::APIClient::Helpers::lookup_api_method($path, $method);
+    my $uri_param = {};
+    my $info = PVE::APIClient::Helpers::find_method_info($path, $method, $uri_param);
 
     my $conn = PVE::APIClient::Config->remote_conn($config, $remote);
 
@@ -84,8 +84,12 @@ my $path_returns = { type => 'null' };
 
 # dynamically update schema definition for direct API call
 # like: pveclient api <get|set|create|delete|help> <remote> <path>
-if (my $info =  PVE::APIClient::Helpers::extract_path_info()) {
-    $path_properties = $info->{parameters}->{properties};
+my $uri_param = {};
+if (my $info = PVE::APIClient::Helpers::extract_path_info($uri_param)) {
+    foreach my $key (keys %{$info->{parameters}->{properties}}) {
+	next if defined($uri_param->{$key});
+	$path_properties->{$key} = $info->{parameters}->{properties}->{$key};
+    }
     $path_returns = $info->{returns};
 }
 

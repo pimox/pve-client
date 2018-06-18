@@ -108,26 +108,47 @@ sub get_api_definition {
     return $pve_api_definition;
 }
 
-sub lookup_api_method {
-    my ($path, $method, $noerr) = @_;
+my $map_path_to_info = sub {
+    my ($child_list, $stack, $uri_param) = @_;
 
-    get_api_definition(); # make sure API data is loaded
+    while (defined(my $comp = shift @$stack)) {
+	foreach my $child (@$child_list) {
+	    my $text = $child->{text};
 
-    my $info = $pve_api_path_hash->{$path};
-
-    if (!$info) {
-	return undef if $noerr;
-	die "unable to find API info for path '$path'\n";
+	    if ($text eq $comp) {
+		# found
+	    } elsif ($text =~ m/^\{(\S+)\}$/) {
+		# found
+		$uri_param->{$1} = $comp;
+	    } else {
+		next; # text next child
+	    }
+	    if ($child->{leaf} || !scalar(@$stack)) {
+		return $child;
+	    } else {
+		$child_list = $child->{children};
+		last; # test next path component
+	    }
+	}
     }
+    return undef;
+};
 
-    my $data = $info->{info}->{$method};
+sub find_method_info {
+    my ($path, $method, $uri_param, $noerr) = @_;
 
-    if (!$data) {
+    $uri_param //= {};
+
+    my $stack = [ grep { length($_) > 0 }  split('\/+' , $path)]; # skip empty fragments
+
+    my $child = $map_path_to_info->(get_api_definition(), $stack, $uri_param);
+
+    if (!($child && $child->{info} && $child->{info}->{$method})) {
 	return undef if $noerr;
 	die "unable to find API method '$method' for path '$path'\n";
     }
 
-    return $data;
+    return $child->{info}->{$method};
 }
 
 sub complete_api_call_options {
@@ -188,26 +209,38 @@ sub complete_api_path {
 	$dir = '';
 	$info = { children => $pve_api_definition };
     } else {
-	$info = $pve_api_path_hash->{"/$dir"};
+	my $stack = [ grep { length($_) > 0 }  split('\/+' , $dir)]; # skip empty fragments
+	$info = $map_path_to_info->($pve_api_definition, $stack, {});
     }
 
     my $res = [];
     if ($info) {
+	my $prefix = length($dir) ? "/$dir/" : '/';
 	if (my $children = $info->{children}) {
 	    foreach my $c (@$children) {
-		if ($c->{path} =~ m!\Q$dir/$rest!) {
-		    push @$res, $c->{path};
-		    push @$res, "$c->{path}/" if $c->{children};
+		my $ctext = $c->{text};
+		if ($ctext =~ m/^\{(\S+)\}$/) {
+		    push @$res, "$prefix$ctext";
+		    push @$res, "$prefix$ctext/";
+		    if (length($rest)) {
+			push @$res, "$prefix$rest";
+			push @$res, "$prefix$rest/";
+		    }
+		} elsif ($ctext =~ m/^\Q$rest/) {
+		    push @$res, "$prefix$ctext";
+		    push @$res, "$prefix$ctext/" if $c->{children};
 		}
 	    }
 	}
     }
+
     return $res;
 }
 
 # test for command lines with api calls (or similar bash completion calls):
 # example1: pveclient api get remote1 /cluster
 sub extract_path_info {
+    my ($uri_param) = @_;
 
     my $info;
 
@@ -219,7 +252,7 @@ sub extract_path_info {
 
 	my $path = $args->[4];
 	if (my $method = $method_map->{$args->[2]}) {
-	    $info = lookup_api_method($path, $method, 1);
+	    $info = find_method_info($path, $method, $uri_param, 1);
 	}
     };
 
