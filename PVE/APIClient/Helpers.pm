@@ -13,7 +13,6 @@ use Encode;
 use HTTP::Status qw(:constants);
 
 my $pve_api_definition;
-my $pve_api_path_hash;
 
 my $pve_api_definition_fn = "/usr/share/pve-client/pve-api-definition.dat";
 
@@ -22,27 +21,6 @@ my $method_map = {
     set => 'PUT',
     get => 'GET',
     delete => 'DELETE',
-};
-
-my $build_pve_api_path_hash;
-$build_pve_api_path_hash = sub {
-    my ($tree) = @_;
-
-    my $class = ref($tree);
-    return $tree if !$class;
-
-    if ($class eq 'ARRAY') {
-	foreach my $el (@$tree) {
-	    $build_pve_api_path_hash->($el);
-	}
-    } elsif ($class eq 'HASH') {
-	if (defined($tree->{leaf}) && defined(my $path = $tree->{path})) {
-	    $pve_api_path_hash->{$path} = $tree;
-	}
-	foreach my $k (keys %$tree) {
-	    $build_pve_api_path_hash->($tree->{$k});
-	}
-    }
 };
 
 my $default_output_format = 'text';
@@ -102,7 +80,6 @@ sub get_api_definition {
 	open(my $fh, '<',  $pve_api_definition_fn) ||
 	    die "unable to open '$pve_api_definition_fn' - $!\n";
 	$pve_api_definition = Storable::fd_retrieve($fh);
-	$build_pve_api_path_hash->($pve_api_definition);
     }
 
     return $pve_api_definition;
