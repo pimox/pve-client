@@ -429,6 +429,16 @@ __PACKAGE__->register_method ({
 		remote => get_standard_option('pveclient-remote-name'),
 		vmid => get_standard_option('pve-vmid'),
 		node => get_standard_option('pve-node'),
+		quiet => {
+		    description => "Suppress log output.",
+		    type => 'boolean',
+		    optional => 1,
+		},
+		background => {
+		    description => "Do not wait for the command to complete.",
+		    type => 'boolean',
+		    optional => 1,
+		},
 	}),
     },
     returns => { type => 'null'},
@@ -439,12 +449,17 @@ __PACKAGE__->register_method ({
 	my $vmid = $param->{vmid};
 	my $node = PVE::APIClient::Tools::extract_param($param, 'node');
 
+	my $quiet = PVE::APIClient::Tools::extract_param($param, 'quiet');
+	my $background = PVE::APIClient::Tools::extract_param($param, 'background');
+
 	my $config = PVE::APIClient::Config->load();
 	my $conn = PVE::APIClient::Config->remote_conn($config, $remote);
 
 	my $upid = $conn->post("/nodes/$node/lxc", $param);
 
-	print PVE::APIClient::Helpers::poll_task($conn, $node, $upid) . "\n";
+	if (!$background) {
+	    print PVE::APIClient::Helpers::poll_task($conn, $node, $upid, $quiet) . "\n";
+	}
 
 	return undef;
     }});
@@ -475,7 +490,7 @@ __PACKAGE__->register_method ({
 
 	my $upid = $conn->delete("/nodes/$resource->{node}/lxc/$resource->{vmid}", $param);
 
-	print PVE::APIClient::Helpers::poll_task($conn, $resource->{node}, $upid) . "\n";
+	print PVE::APIClient::Helpers::poll_task($conn, $resource->{node}, $upid, 1) . "\n";
 
 	return undef;
     }});

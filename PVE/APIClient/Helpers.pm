@@ -321,19 +321,38 @@ sub get_vmid_resource {
 }
 
 sub poll_task {
-    my ($conn, $node, $upid) = @_;
+    my ($conn, $node, $upid, $quiet) = @_;
 
     my $path = "api2/json/nodes/$node/tasks/$upid/status";
 
     my $task_status;
+    my $last_line = 0;
     while(1) {
+	if (!$quiet) {
+	    my $path = "api2/json/nodes/$node/tasks/$upid/log";
+	    my $task_log = $conn->get($path, {start => $last_line});
+
+	    my $printme = '';
+	    for my $li (@$task_log) {
+		if ($li->{t} eq 'no content') {
+		    next;
+		}
+		$printme .= $li->{t} . "\n";
+		$last_line = $li->{n};
+	    }
+
+	    if ($printme ne '') {
+		print $printme;
+	    }
+	}
+
 	$task_status = $conn->get($path, {});
 
 	if ($task_status->{status} eq "stopped") {
 	    last;
 	}
 
-	sleep(10);
+	sleep(2);
     }
 
     return $task_status->{exitstatus};
