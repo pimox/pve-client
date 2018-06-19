@@ -67,7 +67,10 @@ sub config_filename {
 sub lock_config {
     my ($class, $timeout, $code, @param) = @_;
 
-    my $filename = $class->config_filename();
+    my $dir = PVE::APIClient::Helpers::configuration_directory();
+    make_path($dir);
+
+    my $filename = "$dir/.config.lck";
 
     my $res = PVE::APIClient::Tools::lock_file($filename, $timeout, $code, @param);
 
