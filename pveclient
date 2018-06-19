@@ -51,7 +51,7 @@ sub call_api_method {
 use base qw(PVE::APIClient::CLIHandler);
 
 sub read_password {
-   return PVE::APIClient::PTY::read_password("Remote password: ")
+    return PVE::APIClient::PTY::read_password("Remote password: ")
 }
 
 
@@ -115,7 +115,7 @@ __PACKAGE__->register_method ({
     name => 'pveclient_get',
     path => 'pveclient_get',
     method => 'GET',
-    description => "call API GET on <path>.",
+    description => "Call API GET on <api_path>.",
     parameters => {
 	additionalProperties => 0,
 	properties => $path_properties,
@@ -131,7 +131,7 @@ __PACKAGE__->register_method ({
     name => 'pveclient_set',
     path => 'pveclient_set',
     method => 'PUT',
-    description => "call API PUT on <path>.",
+    description => "Call API PUT on <api_path>.",
     parameters => {
 	additionalProperties => 0,
 	properties => $path_properties,
@@ -147,7 +147,7 @@ __PACKAGE__->register_method ({
     name => 'pveclient_create',
     path => 'pveclient_create',
     method => 'PUSH',
-    description => "call API PUSH on <path>.",
+    description => "Call API PUSH on <api_path>.",
     parameters => {
 	additionalProperties => 0,
 	properties => $path_properties,
@@ -163,7 +163,7 @@ __PACKAGE__->register_method ({
     name => 'pveclient_delete',
     path => 'pveclient_delete',
     method => 'DELETE',
-    description => "call API DELETE on <path>.",
+    description => "Call API DELETE on <api_path>.",
     parameters => {
 	additionalProperties => 0,
 	properties => $path_properties,
