@@ -20,8 +20,8 @@ sub read_password {
 }
 
 __PACKAGE__->register_method ({
-    name => 'list',
-    path => 'list',
+    name => 'remote_list',
+    path => 'remote_list',
     method => 'GET',
     description => "List remotes from your config file.",
     parameters => {
@@ -43,8 +43,8 @@ __PACKAGE__->register_method ({
     }});
 
 __PACKAGE__->register_method ({
-    name => 'add',
-    path => 'add',
+    name => 'remote_add',
+    path => 'remote_add',
     method => 'POST',
     description => "Add a remote to your config file.",
     parameters => PVE::APIClient::RemoteConfig->createSchema(1),
@@ -114,8 +114,8 @@ __PACKAGE__->register_method ({
     }});
 
 __PACKAGE__->register_method ({
-    name => 'update',
-    path => 'update',
+    name => 'remote_set',
+    path => 'remote_set',
     method => 'PUT',
     description => "Update a remote configuration.",
     parameters => PVE::APIClient::RemoteConfig->updateSchema(1),
@@ -160,8 +160,8 @@ __PACKAGE__->register_method ({
     }});
 
 __PACKAGE__->register_method ({
-    name => 'remove',
-    path => 'remove',
+    name => 'remote_delete',
+    path => 'remote_delete',
     method => 'DELETE',
     description => "Removes a remote from your config file.",
     parameters => {
@@ -186,10 +186,10 @@ __PACKAGE__->register_method ({
     }});
 
 our $cmddef = {
-    add => [ __PACKAGE__, 'add', ['name', 'host', 'username']],
-    update => [ __PACKAGE__, 'update', ['name']],
-    remove => [ __PACKAGE__, 'remove', ['name']],
-    list => [__PACKAGE__, 'list'],
+    add => [ __PACKAGE__, 'remote_add', ['name', 'host', 'username']],
+    set => [ __PACKAGE__, 'remote_set', ['name']],
+    delete => [ __PACKAGE__, 'remote_delete', ['name']],
+    list => [__PACKAGE__, 'remote_list'],
 };
 
 1;
