@@ -15,6 +15,8 @@ use PVE::APIClient::JSONSchema qw(get_standard_option);
 use PVE::APIClient::CLIHandler;
 use PVE::APIClient::PTY;
 
+use PVE::APIClient::Helpers;
+
 use base qw(PVE::APIClient::CLIHandler);
 use PVE::APIClient::Config;
 
@@ -415,7 +417,72 @@ __PACKAGE__->register_method ({
 	return undef;
     }});
 
+__PACKAGE__->register_method ({
+    name => 'create',
+    path => 'create',
+    method => 'POST',
+    description => "Create a container",
+    parameters => {
+	additionalProperties => 0,
+	properties => PVE::APIClient::Helpers::merge_api_definition_properties(
+	    '/nodes/{node}/lxc', 'POST', {
+		remote => get_standard_option('pveclient-remote-name'),
+		vmid => get_standard_option('pve-vmid'),
+		node => get_standard_option('pve-node'),
+	}),
+    },
+    returns => { type => 'null'},
+    code => sub {
+	my ($param) = @_;
+
+	my $remote = PVE::APIClient::Tools::extract_param($param, 'remote');
+	my $vmid = $param->{vmid};
+	my $node = PVE::APIClient::Tools::extract_param($param, 'node');
+
+	my $config = PVE::APIClient::Config->load();
+	my $conn = PVE::APIClient::Config->remote_conn($config, $remote);
+
+	my $upid = $conn->post("/nodes/$node/lxc", $param);
+
+	print PVE::APIClient::Helpers::poll_task($conn, $node, $upid) . "\n";
+
+	return undef;
+    }});
+
+__PACKAGE__->register_method ({
+    name => 'destroy',
+    path => 'destroy',
+    method => 'DELETE',
+    description => "Destroy a container",
+    parameters => {
+	additionalProperties => 0,
+	properties => {
+	    remote => get_standard_option('pveclient-remote-name'),
+	    vmid => get_standard_option('pve-vmid'),
+	},
+    },
+    returns => { type => 'null'},
+    code => sub {
+	my ($param) = @_;
+
+	my $remote = PVE::APIClient::Tools::extract_param($param, 'remote');
+	my $vmid = PVE::APIClient::Tools::extract_param($param, 'vmid');
+
+	my $config = PVE::APIClient::Config->load();
+	my $conn = PVE::APIClient::Config->remote_conn($config, $remote);
+
+	my $resource = PVE::APIClient::Helpers::get_vmid_resource($conn, $vmid);
+
+	my $upid = $conn->delete("/nodes/$resource->{node}/lxc/$resource->{vmid}", $param);
+
+	print PVE::APIClient::Helpers::poll_task($conn, $resource->{node}, $upid) . "\n";
+
+	return undef;
+    }});
+
 our $cmddef = {
+    create => [ __PACKAGE__, 'create', ['remote', 'vmid', 'node']],
+    destroy => [ __PACKAGE__, 'destroy', ['remote', 'vmid']],
     enter => [ __PACKAGE__, 'enter', ['remote', 'vmid']],
 };
 

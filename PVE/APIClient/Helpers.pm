@@ -218,6 +218,14 @@ sub complete_api_call_options {
     &$print_result(@option_list);
 }
 
+sub merge_api_definition_properties {
+    my ($path, $method, $properties) = @_;
+
+    my $info = PVE::APIClient::Helpers::find_method_info($path, $method);
+
+    return { %{$info->{parameters}->{properties}}, %$properties };
+}
+
 sub complete_api_path {
     my ($text) = @_;
 
