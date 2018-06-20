@@ -355,6 +355,10 @@ sub poll_task {
 	sleep(2);
     }
 
+    if ($task_status->{exitstatus} ne "OK") {
+	die $task_status->{exitstatus};
+    }
+
     return $task_status->{exitstatus};
 }
 
