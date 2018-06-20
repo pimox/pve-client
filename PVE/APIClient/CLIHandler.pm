@@ -6,6 +6,7 @@ use warnings;
 use PVE::APIClient::SafeSyslog;
 use PVE::APIClient::Exception qw(raise raise_param_exc);
 use PVE::APIClient::RESTHandler;
+use PVE::APIClient::PTY;
 
 
 use base qw(PVE::APIClient::RESTHandler);
@@ -36,6 +37,34 @@ use base qw(PVE::APIClient::RESTHandler);
 my $cmddef;
 my $exename;
 my $cli_handler_class;
+
+my $standard_mappings = {
+    'pve-password' => {
+	name => 'password',
+	desc => '<password>',
+	interactive => 1,
+	func => sub {
+	    my ($value) = @_;
+	    return $value if $value;
+	    return PVE::APIClient::PTY::get_confirmed_password();
+	},
+    },
+};
+sub get_standard_mapping {
+    my ($name, $base) = @_;
+
+    my $std = $standard_mappings->{$name};
+    die "no such standard mapping '$name'\n" if !$std;
+
+    my $res = $base || {};
+
+    foreach my $opt (keys %$std) {
+	next if defined($res->{$opt});
+	$res->{$opt} = $std->{$opt};
+    }
+
+    return $res;
+}
 
 my $assert_initialized = sub {
     my @caller = caller;
@@ -399,6 +428,92 @@ my $print_bash_completion = sub {
     &$print_result(@option_list);
 };
 
+# prints a formatted table with a title row.
+# $formatopts is an array of hashes, with the following keys:
+# 'key' - key of $data element to print
+# 'title' - column title, defaults to 'key' - won't get cutoff
+# 'cutoff' - maximal (print) length of this column values, if set
+#            the last column will never be cutoff
+# 'default' - optional default value for the column
+# formatopts element order defines column order (left to right)
+sub print_text_table {
+    my ($formatopts, $data) = @_;
+
+    my ($formatstring, @keys, @titles, %cutoffs, %defaults);
+    my $last_col = $formatopts->[$#{$formatopts}];
+
+    foreach my $col ( @$formatopts ) {
+	my ($key, $title, $cutoff, $default) = @$col{qw(key title cutoff default)};
+	$title //= $key;
+
+	push @keys, $key;
+	push @titles, $title;
+	$defaults{$key} = $default;
+
+	# calculate maximal print width and cutoff
+	my $titlelen = length($title);
+
+	my $longest = $titlelen;
+	foreach my $entry (@$data) {
+	    my $len = length($entry->{$key}) // 0;
+	    $longest = $len if $len > $longest;
+	}
+
+	$cutoff = (defined($cutoff) && $cutoff < $longest) ? $cutoff : $longest;
+	$cutoffs{$key} = $cutoff;
+
+	my $printalign = $cutoff > $titlelen ? '-' : '';
+	if ($col == $last_col) {
+	    $formatstring .= "%${printalign}${titlelen}s\n";
+	} else {
+	    $formatstring .= "%${printalign}${cutoff}s ";
+	}
+    }
+
+    printf $formatstring, @titles;
+
+    foreach my $entry (sort { $a->{$keys[0]} cmp $b->{$keys[0]} } @$data) {
+        printf $formatstring, map { substr(($entry->{$_} // $defaults{$_}), 0 , $cutoffs{$_}) } @keys;
+    }
+}
+
+sub print_entry {
+    my $entry = shift;
+
+    #TODO: handle objects/hashes as well
+    foreach my $item (sort keys %$entry) {
+	if (ref($entry->{$item}) eq 'ARRAY') {
+	    printf "%s: [ %s ]\n", $item, join(", ", @{$entry->{$item}});
+	} else {
+	    printf "%s: %s\n", $item, $entry->{$item};
+	}
+    }
+}
+
+# prints the result of an API GET call returning an array
+# and to have the results key of the API call defined.
+sub print_api_list {
+    my ($props_to_print, $data, $returninfo) = @_;
+
+    die "can only print array result" if $returninfo->{type} ne 'array';
+
+    my $returnprops = $returninfo->{items}->{properties};
+
+    my $formatopts = [];
+    foreach my $prop ( @$props_to_print ) {
+	my $propinfo = $returnprops->{$prop};
+	my $colopts = {
+	    key => $prop,
+	    title => $propinfo->{title},
+	    default => $propinfo->{default},
+	    cutoff => $propinfo->{print_width} // $propinfo->{maxLength},
+	};
+	push @$formatopts, $colopts;
+    }
+
+    print_text_table($formatopts, $data);
+}
+
 sub verify_api {
     my ($class) = @_;
 
@@ -500,7 +615,10 @@ my $handle_cmd  = sub {
 
     my $res = $class->cli_handler($cmd_str, $name, $cmd_args, $arg_param, $uri_param, $read_password_func, $param_mapping_func);
 
-    &$outsub($res) if $outsub;
+    if (defined $outsub) {
+	my $returninfo = $class->map_method_by_name($name)->{returns};
+	$outsub->($res, $returninfo);
+    }
 };
 
 my $handle_simple_cmd = sub {
@@ -535,7 +653,10 @@ my $handle_simple_cmd = sub {
 
     my $res = $class->cli_handler($name, $name, \@ARGV, $arg_param, $uri_param, $read_password_func, $param_mapping_func);
 
-    &$outsub($res) if $outsub;
+    if (defined $outsub) {
+	my $returninfo = $class->map_method_by_name($name)->{returns};
+	$outsub->($res, $returninfo);
+    }
 };
 
 sub run_cli_handler {
