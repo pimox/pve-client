@@ -41,40 +41,6 @@ sub get_output_format {
     return $client_output_format;
 }
 
-sub print_result {
-    my ($data, $result_schema) = @_;
-
-    my $format = get_output_format();
-
-    return if $result_schema->{type} eq 'null';
-
-    # TODO: implement different output formats ($format)
-
-    if ($format eq 'json') {
-       print to_json($data, {utf8 => 1, allow_nonref => 1, canonical => 1, pretty => 1 });
-    } elsif ($format eq 'text') {
-       my $type = $result_schema->{type};
-       if ($type eq 'object') {
-           die "implement me";
-       } elsif ($type eq 'array') {
-           my $item_type = $result_schema->{items}->{type};
-           if ($item_type eq 'object') {
-               die "implement me";
-           } elsif ($item_type eq 'array') {
-               die "implement me";
-           } else {
-               foreach my $el (@$data) {
-                   print "$el\n"
-               }
-           }
-       } else {
-           print "$data\n";
-       }
-    } else {
-       die "internal error: unknown output format"; # should not happen
-    }
-}
-
 my $__real_remove_formats; $__real_remove_formats = sub {
     my ($properties) = @_;
 

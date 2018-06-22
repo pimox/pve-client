@@ -108,7 +108,8 @@ $path_properties->{api_path} = {
 my $format_result = sub {
     my ($data) = @_;
 
-    PVE::APIClient::Helpers::print_result($data, $path_returns);
+    my $format = PVE::APIClient::Helpers::get_output_format();
+    PVE::APIClient::CLIHandler::print_api_result($format, $data, $path_returns);
 };
 
 __PACKAGE__->register_method ({
