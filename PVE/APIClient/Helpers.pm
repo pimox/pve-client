@@ -51,30 +51,29 @@ sub print_result {
     # TODO: implement different output formats ($format)
 
     if ($format eq 'json') {
-	print to_json($data, {utf8 => 1, allow_nonref => 1, canonical => 1, pretty => 1 });
+       print to_json($data, {utf8 => 1, allow_nonref => 1, canonical => 1, pretty => 1 });
     } elsif ($format eq 'text') {
-	my $type = $result_schema->{type};
-	if ($type eq 'object') {
-	    die "implement me";
-	} elsif ($type eq 'array') {
-	    my $item_type = $result_schema->{items}->{type};
-	    if ($item_type eq 'object') {
-		die "implement me";
-	    } elsif ($item_type eq 'array') {
-		die "implement me";
-	    } else {
-		foreach my $el (@$data) {
-		    print "$el\n"
-		}
-	    }
-	} else {
-	    print "$data\n";
-	}
+       my $type = $result_schema->{type};
+       if ($type eq 'object') {
+           die "implement me";
+       } elsif ($type eq 'array') {
+           my $item_type = $result_schema->{items}->{type};
+           if ($item_type eq 'object') {
+               die "implement me";
+           } elsif ($item_type eq 'array') {
+               die "implement me";
+           } else {
+               foreach my $el (@$data) {
+                   print "$el\n"
+               }
+           }
+       } else {
+           print "$data\n";
+       }
     } else {
-	die "internal error: unknown output format"; # should not happen
+       die "internal error: unknown output format"; # should not happen
     }
 }
-
 
 my $__real_remove_formats; $__real_remove_formats = sub {
     my ($properties) = @_;
@@ -164,7 +163,9 @@ sub find_method_info {
 
     my $stack = [ grep { length($_) > 0 }  split('\/+' , $path)]; # skip empty fragments
 
-    my $child = $map_path_to_info->(get_api_definition(), $stack, $uri_param);
+    my $api = get_api_definition();
+
+    my $child = scalar(@$stack) ? $map_path_to_info->($api->{children}, $stack, $uri_param) : $api;
 
     if (!($child && $child->{info} && $child->{info}->{$method})) {
 	return undef if $noerr;
@@ -229,7 +230,7 @@ sub merge_api_definition_properties {
 sub complete_api_path {
     my ($text) = @_;
 
-    get_api_definition(); # make sure API data is loaded
+    my $api = get_api_definition(); # make sure API data is loaded
 
     $text =~ s!^/!!;
 
@@ -238,10 +239,10 @@ sub complete_api_path {
     my $info;
     if (!defined($dir)) {
 	$dir = '';
-	$info = { children => $pve_api_definition };
+	$info = $api;
     } else {
 	my $stack = [ grep { length($_) > 0 }  split('\/+' , $dir)]; # skip empty fragments
-	$info = $map_path_to_info->($pve_api_definition, $stack, {});
+	$info = $map_path_to_info->($api->{children}, $stack, {});
     }
 
     my $res = [];

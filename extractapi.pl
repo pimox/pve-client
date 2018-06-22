@@ -32,9 +32,16 @@ sub remove_code_refs {
     }
 }
 
-my $tree = PVE::RESTHandler::api_dump('PVE::API2', undef, 1);
+my $root = {
+    path => '/',
+    text => '',
+    children =>  PVE::RESTHandler::api_dump('PVE::API2', undef, 1),
+    info => {
+	GET =>  PVE::API2->map_method_by_name('index'),
+    },
+};
 
-remove_code_refs($tree);
-Storable::store_fd($tree, \*STDOUT);
+remove_code_refs($root);
+Storable::store_fd($root, \*STDOUT);
 
 exit(0);
