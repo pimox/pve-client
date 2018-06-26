@@ -8,6 +8,7 @@ use Cwd 'abs_path';
 use Data::Dumper;
 
 use PVE::APIClient::JSONSchema qw(register_standard_option get_standard_option);
+use PVE::APIClient::CLIFormatter;
 use PVE::APIClient::CLIHandler;
 use PVE::APIClient::PTY;
 
@@ -109,7 +110,10 @@ my $format_result = sub {
     my ($data) = @_;
 
     my $format = PVE::APIClient::Helpers::get_output_format();
-    PVE::APIClient::CLIHandler::print_api_result($format, $data, $path_returns);
+
+    my $options = PVE::APIClient::CLIFormatter::query_terminal_options({});
+
+    PVE::APIClient::CLIFormatter::print_api_result($format, $data, $path_returns, undef, $options);
 };
 
 __PACKAGE__->register_method ({

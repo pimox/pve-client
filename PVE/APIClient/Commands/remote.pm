@@ -19,6 +19,15 @@ sub read_password {
    return PVE::APIClient::PTY::read_password("Remote password: ")
 }
 
+# define as array to keep ordering
+my $remote_list_returns_properties = [
+    name => get_standard_option('pveclient-remote-name'),
+    host => { type => 'string', format => 'address' },
+    username => { type => 'string' },
+    port => { type => 'integer', optional => 1 },
+    fingerprint =>  { type => 'string', optional => 1 },
+    ];
+
 __PACKAGE__->register_method ({
     name => 'remote_list',
     path => 'remote_list',
@@ -26,20 +35,33 @@ __PACKAGE__->register_method ({
     description => "List remotes from your config file.",
     parameters => {
 	additionalProperties => 0,
+	properties => {
+	    'format' => get_standard_option('pveclient-output-format'),
+	},
     },
-    returns => { type => 'null' },
+    returns => {
+	type => 'array',
+	items => {
+	    type => 'object',
+	    properties => { @$remote_list_returns_properties },
+	},
+    },
     code => sub {
+	my ($param) = @_;
+
+	my $format = PVE::APIClient::Tools::extract_param($param, 'format');
+	PVE::APIClient::Helpers::set_output_format($format);
+
 	my $config = PVE::APIClient::Config->load();
 
-	printf("%10s %10s %10s %10s %100s\n", "Name", "Host", "Port", "Username", "Fingerprint");
+	my $res = [];
 	for my $name (keys %{$config->{ids}}) {
 	    my $data = $config->{ids}->{$name};
 	    next if $data->{type} ne 'remote';
-	    printf("%10s %10s %10s %10s %100s\n", $name, $data->{'host'},
-		   $data->{'port'} // '-', $data->{'username'}, $data->{'fingerprint'} // '-');
+	    push @$res, $data;
 	}
 
-	return undef;
+	return $res;
     }});
 
 __PACKAGE__->register_method ({
@@ -189,7 +211,9 @@ our $cmddef = {
     add => [ __PACKAGE__, 'remote_add', ['name', 'host', 'username']],
     set => [ __PACKAGE__, 'remote_set', ['name']],
     delete => [ __PACKAGE__, 'remote_delete', ['name']],
-    list => [__PACKAGE__, 'remote_list'],
+    list => [__PACKAGE__, 'remote_list', undef, {}, sub {
+	PVE::APIClient::Helpers::print_ordered_result($remote_list_returns_properties, @_);
+    }],
 };
 
 1;

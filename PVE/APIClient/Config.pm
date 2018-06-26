@@ -31,7 +31,7 @@ my $complete_remote_name = sub {
 PVE::APIClient::JSONSchema::register_standard_option('pveclient-output-format', {
     type => 'string',
     description => 'Output format.',
-    enum => [ 'text', 'json' ],
+    enum => [ 'text', 'plain', 'json' ],
     optional => 1,
     default => 'text',
 });

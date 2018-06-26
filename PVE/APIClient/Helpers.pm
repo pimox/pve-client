@@ -9,6 +9,9 @@ use File::Path qw(make_path);
 
 use PVE::APIClient::JSONSchema;
 use PVE::APIClient::Exception qw(raise);
+use PVE::APIClient::CLIFormatter;
+use PVE::APIClient::CLIHandler;
+use PVE::APIClient::PTY;
 use Encode::Locale;
 use Encode;
 use HTTP::Status qw(:constants);
@@ -395,5 +398,24 @@ sub ticket_cache_update {
     die $@ if $@;
 }
 
+sub extract_even_elements {
+    my ($list) = @_;
+
+    my $ind = 0;
+    return [ grep { ($ind++ % 2) == 0 } @$list ];
+}
+
+sub print_ordered_result {
+    my ($property_list, $data, $result_schema) = @_;
+
+    my $format = get_output_format();
+    my $param_order = extract_even_elements($property_list);
+
+    $options = {};
+
+    PVE::APIClient::CLIFormatter::query_terminal_options($options);
+
+    PVE::APIClient::CLIFormatter::print_api_result($format, $data, $result_schema, $param_order, $options);
+}
 
 1;
