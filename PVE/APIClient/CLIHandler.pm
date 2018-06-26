@@ -9,6 +9,7 @@ use PVE::APIClient::Exception qw(raise raise_param_exc);
 use PVE::APIClient::RESTHandler;
 use PVE::APIClient::PTY;
 
+use PVE::APIClient::CLIFormatter;
 
 use base qw(PVE::APIClient::RESTHandler);
 
@@ -66,6 +67,31 @@ sub get_standard_mapping {
 
     return $res;
 }
+
+my $gen_param_mapping_func = sub {
+    my ($cli_handler_class) = @_;
+
+    my $param_mapping = $cli_handler_class->can('param_mapping');
+
+    if (!$param_mapping) {
+	my $read_password = $cli_handler_class->can('read_password');
+	my $string_param_mapping = $cli_handler_class->can('string_param_file_mapping');
+
+	return $string_param_mapping if !$read_password;
+
+	$param_mapping = sub {
+	    my ($name) = @_;
+
+	    my $password_map = get_standard_mapping('pve-password', {
+		func => $read_password
+	    });
+	    my $map = $string_param_mapping ? $string_param_mapping->($name) : [];
+	    return [@$map, $password_map];
+	};
+    }
+
+    return $param_mapping;
+};
 
 my $assert_initialized = sub {
     my @caller = caller;
@@ -159,9 +185,7 @@ sub generate_usage_str {
     $separator //= '';
     $indent //= '';
 
-    my $read_password_func = $cli_handler_class->can('read_password');
-    my $param_mapping_func = $cli_handler_class->can('param_mapping') ||
-	$cli_handler_class->can('string_param_file_mapping');
+    my $param_cb = $gen_param_mapping_func->($cli_handler_class);
 
     my ($subcmd, $def, undef, undef, $cmdstr) = resolve_cmd($cmd);
     $abort->("unknown command '$cmdstr'") if !defined($def) && ref($cmd) eq 'ARRAY';
@@ -181,8 +205,7 @@ sub generate_usage_str {
 		    $str .= $separator if $oldclass && $oldclass ne $class;
 		    $str .= $indent;
 		    $str .= $class->usage_str($name, "$prefix $cmd", $arg_param,
-		                              $fixed_param, $format,
-		                              $read_password_func, $param_mapping_func);
+		                              $fixed_param, $format, $param_cb);
 		    $oldclass = $class;
 
 		} elsif (defined($def->{$cmd}->{alias}) && ($format eq 'asciidoc')) {
@@ -205,8 +228,7 @@ sub generate_usage_str {
 	    $abort->("unknown command '$cmd'") if !$class;
 
 	    $str .= $indent;
-	    $str .= $class->usage_str($name, $prefix, $arg_param, $fixed_param, $format,
-	                              $read_password_func, $param_mapping_func);
+	    $str .= $class->usage_str($name, $prefix, $arg_param, $fixed_param, $format, $param_cb);
 	}
 	return $str;
     };
@@ -429,147 +451,6 @@ my $print_bash_completion = sub {
     &$print_result(@option_list);
 };
 
-sub data_to_text {
-    my ($data) = @_;
-
-    return undef if !defined($data);
-
-    if (my $class = ref($data)) {
-	return to_json($data, { utf8 => 1, canonical => 1 });
-    } else {
-	return "$data";
-    }
-}
-
-# prints a formatted table with a title row.
-# $formatopts is an array of hashes, with the following keys:
-# 'key' - key of $data element to print
-# 'title' - column title, defaults to 'key' - won't get cutoff
-# 'cutoff' - maximal (print) length of this column values, if set
-#            the last column will never be cutoff
-# 'default' - optional default value for the column
-# formatopts element order defines column order (left to right)
-# sorts the output according to the leftmost column not containing any undef
-sub print_text_table {
-    my ($formatopts, $data) = @_;
-
-    my ($formatstring, @keys, @titles, %cutoffs, %defaults, $sort_key);
-    my $last_col = $formatopts->[$#{$formatopts}];
-
-    foreach my $col ( @$formatopts ) {
-	my ($key, $title, $cutoff) = @$col{qw(key title cutoff)};
-	$title //= $key;
-
-	push @keys, $key;
-	push @titles, $title;
-	$defaults{$key} = $col->{default} // '';
-
-	# calculate maximal print width and cutoff
-	my $titlelen = length($title);
-
-	my $longest = $titlelen;
-	my $sortable = 1;
-	foreach my $entry (@$data) {
-	    my $len = length(data_to_text($entry->{$key})) // 0;
-	    $longest = $len if $len > $longest;
-	    $sortable = 0 if !defined($entry->{$key});
-	}
-
-	$sort_key //= $key if $sortable;
-	$cutoff = (defined($cutoff) && $cutoff < $longest) ? $cutoff : $longest;
-	$cutoffs{$key} = $cutoff;
-
-	my $printalign = $cutoff > $titlelen ? '-' : '';
-	if ($col == $last_col) {
-	    $formatstring .= "%${printalign}${titlelen}s\n";
-	} else {
-	    $formatstring .= "%${printalign}${cutoff}s ";
-	}
-    }
-
-    printf $formatstring, @titles;
-
-    if (defined($sort_key)){
-	@$data = sort { $a->{$sort_key} cmp $b->{$sort_key} } @$data;
-    }
-    foreach my $entry (@$data) {
-        printf $formatstring, map { substr((data_to_text($entry->{$_}) // $defaults{$_}), 0 , $cutoffs{$_}) } @keys;
-    }
-}
-
-# prints the result of an API GET call returning an array as a table.
-# takes formatting information from the results property of the call
-# if $props_to_print is provided, prints only those columns. otherwise
-# takes all fields of the results property, with a fallback
-# to all fields occuring in items of $data.
-sub print_api_list {
-    my ($data, $result_schema, $props_to_print) = @_;
-
-    die "can only print object lists\n"
-	if !($result_schema->{type} eq 'array' && $result_schema->{items}->{type} eq 'object');
-
-    my $returnprops = $result_schema->{items}->{properties};
-
-    if (!defined($props_to_print)) {
-	$props_to_print = [ sort keys %$returnprops ];
-	if (!scalar(@$props_to_print)) {
-	    my $all_props = {};
-	    foreach my $obj (@{$data}) {
-		foreach my $key (keys %{$obj}) {
-		    $all_props->{ $key } = 1;
-		}
-	    }
-	    $props_to_print = [ sort keys %{$all_props} ];
-	}
-	die "unable to detect list properties\n" if !scalar(@$props_to_print);
-    }
-
-    my $formatopts = [];
-    foreach my $prop ( @$props_to_print ) {
-	my $propinfo = $returnprops->{$prop};
-	my $colopts = {
-	    key => $prop,
-	    title => $propinfo->{title},
-	    default => $propinfo->{default},
-	    cutoff => $propinfo->{print_width} // $propinfo->{maxLength},
-	};
-	push @$formatopts, $colopts;
-    }
-
-    print_text_table($formatopts, $data);
-}
-
-sub print_api_result {
-    my ($format, $data, $result_schema) = @_;
-
-    return if $result_schema->{type} eq 'null';
-
-    if ($format eq 'json') {
-	print to_json($data, {utf8 => 1, allow_nonref => 1, canonical => 1, pretty => 1 });
-    } elsif ($format eq 'text') {
-	my $type = $result_schema->{type};
-	if ($type eq 'object') {
-	    foreach my $key (sort keys %$data) {
-		print $key . ": " .  data_to_text($data->{$key}) . "\n";
-	    }
-	} elsif ($type eq 'array') {
-	    return if !scalar(@$data);
-	    my $item_type = $result_schema->{items}->{type};
-	    if ($item_type eq 'object') {
-		print_api_list($data, $result_schema);
-	    } else {
-		foreach my $entry (@$data) {
-		    print data_to_text($entry) . "\n";
-		}
-	    }
-	} else {
-	    print "$data\n";
-	}
-    } else {
-	die "internal error: unknown output format"; # should not happen
-    }
-}
-
 sub verify_api {
     my ($class) = @_;
 
@@ -639,7 +520,7 @@ sub setup_environment {
 }
 
 my $handle_cmd  = sub {
-    my ($args, $read_password_func, $preparefunc, $param_mapping_func) = @_;
+    my ($args, $preparefunc, $param_cb) = @_;
 
     $cmddef->{help} = [ __PACKAGE__, 'help', ['extra-args'] ];
 
@@ -669,7 +550,7 @@ my $handle_cmd  = sub {
     my ($class, $name, $arg_param, $uri_param, $outsub) = @{$def || []};
     $abort->("unknown command '$cmd_str'") if !$class;
 
-    my $res = $class->cli_handler($cmd_str, $name, $cmd_args, $arg_param, $uri_param, $read_password_func, $param_mapping_func);
+    my $res = $class->cli_handler($cmd_str, $name, $cmd_args, $arg_param, $uri_param, $param_cb);
 
     if (defined $outsub) {
 	my $result_schema = $class->map_method_by_name($name)->{returns};
@@ -678,7 +559,7 @@ my $handle_cmd  = sub {
 };
 
 my $handle_simple_cmd = sub {
-    my ($args, $read_password_func, $preparefunc, $param_mapping_func) = @_;
+    my ($args, $preparefunc, $param_cb) = @_;
 
     my ($class, $name, $arg_param, $uri_param, $outsub) = @{$cmddef};
     die "no class specified" if !$class;
@@ -707,7 +588,7 @@ my $handle_simple_cmd = sub {
 
     &$preparefunc() if $preparefunc;
 
-    my $res = $class->cli_handler($name, $name, \@ARGV, $arg_param, $uri_param, $read_password_func, $param_mapping_func);
+    my $res = $class->cli_handler($name, $name, \@ARGV, $arg_param, $uri_param, $param_cb);
 
     if (defined $outsub) {
 	my $result_schema = $class->map_method_by_name($name)->{returns};
@@ -731,9 +612,7 @@ sub run_cli_handler {
 
     my $preparefunc = $params{prepare};
 
-    my $read_password_func = $class->can('read_password');
-    my $param_mapping_func = $cli_handler_class->can('param_mapping') ||
-	$class->can('string_param_file_mapping');
+    my $param_cb = $gen_param_mapping_func->($cli_handler_class);
 
     $exename = &$get_exe_name($class);
 
@@ -743,9 +622,9 @@ sub run_cli_handler {
     $cmddef = ${"${class}::cmddef"};
 
     if (ref($cmddef) eq 'ARRAY') {
-	&$handle_simple_cmd(\@ARGV, $read_password_func, $preparefunc, $param_mapping_func);
+	$handle_simple_cmd->(\@ARGV, $preparefunc, $param_cb);
     } else {
-	&$handle_cmd(\@ARGV, $read_password_func, $preparefunc, $param_mapping_func);
+	$handle_cmd->(\@ARGV, $preparefunc, $param_cb);
     }
 
     exit 0;

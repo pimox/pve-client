@@ -15,6 +15,7 @@ BASHCOMPLDIR=${DESTDIR}/usr/share/bash-completion/completions/
 PVE_COMMON_FILES=    		\
 	Tools.pm		\
 	Syscall.pm		\
+	CLIFormatter.pm		\
 	CLIHandler.pm		\
 	JSONSchema.pm		\
 	PTY.pm			\
