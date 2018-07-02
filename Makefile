@@ -81,7 +81,7 @@ distclean: clean
 
 clean:
 	rm -rf ./build *.deb *.changes *.buildinfo
-	rm pveclient.1-synopsis.adoc pveclient.1
+	rm -f pveclient.1-synopsis.adoc pveclient.1
 	find . -name '*~' -exec rm {} ';'
 
 .PHONY: dinstall
