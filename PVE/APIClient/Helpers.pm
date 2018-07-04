@@ -405,16 +405,23 @@ sub extract_even_elements {
     return [ grep { ($ind++ % 2) == 0 } @$list ];
 }
 
-sub print_ordered_result {
-    my ($property_list, $data, $result_schema) = @_;
-
-    my $format = get_output_format();
-    my $param_order = extract_even_elements($property_list);
+sub print_result {
+    my ($data, $result_schema, $param_order) = @_;
 
     my $options = {};
     PVE::APIClient::CLIFormatter::query_terminal_options($options);
 
-    PVE::APIClient::CLIFormatter::print_api_result($format, $data, $result_schema, $param_order, $options);
+    my $format = get_output_format();
+    PVE::APIClient::CLIFormatter::print_api_result(
+	$format, $data, $result_schema, $param_order, $options);
+}
+
+sub print_ordered_result {
+    my ($property_list, $data, $result_schema) = @_;
+
+    my $param_order = extract_even_elements($property_list);
+
+    print_result($data, $result_schema, $param_order);
 }
 
 1;
