@@ -13,6 +13,9 @@ use PVE::APIClient::CLIHandler;
 
 use base qw(PVE::APIClient::CLIHandler);
 
+my $list_return_props = { %{PVE::APIClient::DefaultsConfig->updateSchema(1)->{properties}} };
+delete $list_return_props->{delete};
+
 __PACKAGE__->register_method ({
     name => 'list',
     path => 'list',
@@ -21,17 +24,19 @@ __PACKAGE__->register_method ({
     parameters => {
 	additionalProperties => 0,
     },
-    returns => { type => 'null' },
+    returns => {
+	type => 'object',
+	properties => $list_return_props,
+    },
     code => sub {
 
 	my $config = PVE::APIClient::Config->load();
 
 	my $defaults = PVE::APIClient::Config->get_defaults($config);
 
+	$defaults->{digest} = $config->{digest};
 
-	print Dumper($config);
-
-	return undef;
+	return $defaults;
     }});
 
 __PACKAGE__->register_method ({
@@ -82,7 +87,7 @@ __PACKAGE__->register_method ({
 
 our $cmddef = {
     set => [ __PACKAGE__, 'set',],
-    list => [__PACKAGE__, 'list'],
+    list => [__PACKAGE__, 'list', undef, undef, sub { PVE::APIClient::Helpers::print_result(@_);}],
 };
 
 1;
