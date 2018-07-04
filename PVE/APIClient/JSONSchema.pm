@@ -105,6 +105,14 @@ register_standard_option('fingerprint-sha256', {
     pattern => '([A-Fa-f0-9]{2}:){31}[A-Fa-f0-9]{2}',
 });
 
+register_standard_option('pve-output-format', {
+    type => 'string',
+    description => 'Output format.',
+    enum => [ 'text', 'plain', 'json' ],
+    optional => 1,
+    default => 'text',
+});
+
 my $format_list = {};
 
 sub register_format {
@@ -1080,6 +1088,11 @@ my $default_schema_noref = {
 	    type => "string",
 	    optional => 1,
 	    description => "This provides the title of the property",
+	},
+	renderer => {
+	    type => "string",
+	    optional => 1,
+	    description => "This is used to provide rendering hints to format cli command output.",
 	},
 	requires => {
 	    type => [ "string", "object" ],
