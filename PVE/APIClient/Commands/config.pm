@@ -54,6 +54,9 @@ __PACKAGE__->register_method ({
 
 	my $code = sub {
 	    my $config = PVE::APIClient::Config->load();
+
+	    PVE::APIClient::Tools::assert_if_modified($config->{digest}, $digest);
+
 	    my $defaults = PVE::APIClient::Config->get_defaults($config);
 
 	    my $plugin = PVE::APIClient::Config->lookup('defaults');
