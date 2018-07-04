@@ -28,14 +28,6 @@ my $complete_remote_name = sub {
     return $list;
 };
 
-PVE::APIClient::JSONSchema::register_standard_option('pveclient-output-format', {
-    type => 'string',
-    description => 'Output format.',
-    enum => [ 'text', 'plain', 'json' ],
-    optional => 1,
-    default => 'text',
-});
-
 PVE::APIClient::JSONSchema::register_standard_option('pveclient-remote-name', {
     description => "The name of the remote.",
     type => 'string',

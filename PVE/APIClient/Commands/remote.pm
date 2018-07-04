@@ -36,7 +36,7 @@ __PACKAGE__->register_method ({
     parameters => {
 	additionalProperties => 0,
 	properties => {
-	    'format' => get_standard_option('pveclient-output-format'),
+	    'format' => get_standard_option('pve-output-format'),
 	},
     },
     returns => {

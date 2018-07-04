@@ -94,7 +94,7 @@ if (my $info = PVE::APIClient::Helpers::extract_path_info($uri_param)) {
     $path_returns = $info->{returns};
 }
 
-$path_properties->{format} = get_standard_option('pveclient-output-format'),
+$path_properties->{format} = get_standard_option('pve-output-format'),
 $path_properties->{remote} = get_standard_option('pveclient-remote-name');
 $path_properties->{api_path} = {
     description => "API path.",
@@ -151,8 +151,8 @@ __PACKAGE__->register_method ({
 __PACKAGE__->register_method ({
     name => 'pveclient_create',
     path => 'pveclient_create',
-    method => 'PUSH',
-    description => "Call API PUSH on <api_path>.",
+    method => 'POST',
+    description => "Call API POST on <api_path>.",
     parameters => {
 	additionalProperties => 0,
 	properties => $path_properties,

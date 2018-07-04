@@ -30,7 +30,7 @@ __PACKAGE__->register_method ({
 	additionalProperties => 0,
 	properties => {
 	    remote => get_standard_option('pveclient-remote-name'),
-	    'format' => get_standard_option('pveclient-output-format'),
+	    'format' => get_standard_option('pve-output-format'),
 	},
     },
     returns => {
