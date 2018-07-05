@@ -3,12 +3,31 @@ package PVE::APIClient::CLIFormatter;
 use strict;
 use warnings;
 use I18N::Langinfo;
+use POSIX qw(strftime);
 
 use PVE::APIClient::JSONSchema;
 use PVE::APIClient::PTY;
 use JSON;
 use utf8;
 use Encode;
+
+sub render_timestamp {
+    my ($epoch) = @_;
+
+    # ISO 8601 date format
+    return strftime("%F %H:%M:%S", localtime($epoch));
+}
+
+PVE::APIClient::JSONSchema::register_renderer('timestamp', \&render_timestamp);
+
+sub render_timestamp_gmt {
+    my ($epoch) = @_;
+
+    # ISO 8601 date format, standard Greenwich time zone
+    return strftime("%F %H:%M:%S", gmtime($epoch));
+}
+
+PVE::APIClient::JSONSchema::register_renderer('timestamp_gmt', \&render_timestamp_gmt);
 
 sub render_duration {
     my ($duration_in_seconds) = @_;
@@ -79,7 +98,7 @@ sub query_terminal_options {
 }
 
 sub data_to_text {
-    my ($data, $propdef) = @_;
+    my ($data, $propdef, $options) = @_;
 
     return '' if !defined($data);
 
@@ -95,7 +114,7 @@ sub data_to_text {
 	if (defined(my $renderer = $propdef->{renderer})) {
 	    my $code = PVE::APIClient::JSONSchema::get_renderer($renderer);
 	    die "internal error: unknown renderer '$renderer'" if !$code;
-	    return $code->($data);
+	    return $code->($data, $options);
 	}
     }
 
@@ -160,7 +179,7 @@ sub print_text_table {
 	    my $prop = $props_to_print->[$i];
 	    my $propinfo = $returnprops->{$prop} // {};
 
-	    my $text = data_to_text($entry->{$prop}, $propinfo);
+	    my $text = data_to_text($entry->{$prop}, $propinfo, $options);
 	    my $lines = [ split(/\n/, $text) ];
 	    my $linecount = scalar(@$lines);
 	    $height = $linecount if $linecount > $height;
@@ -358,21 +377,24 @@ sub print_api_result {
 	    $props_to_print = [ sort keys %$data ] if !scalar(@$props_to_print);
 	    my $kvstore = [];
 	    foreach my $key (@$props_to_print) {
-		push @$kvstore, { key => $key, value => data_to_text($data->{$key}, $result_schema->{properties}->{$key}) };
+		push @$kvstore, { key => $key, value => data_to_text($data->{$key}, $result_schema->{properties}->{$key}, $options) };
 	    }
 	    my $schema = { type => 'array', items => { type => 'object' }};
 	    $options->{border} = $format eq 'text';
 	    print_api_list($kvstore, $schema, ['key', 'value'], $options);
 	} elsif ($type eq 'array') {
 	    return if !scalar(@$data);
+	    $options->{border} = $format eq 'text';
 	    my $item_type = $result_schema->{items}->{type};
 	    if ($item_type eq 'object') {
-		$options->{border} = $format eq 'text';
 		print_api_list($data, $result_schema, $props_to_print, $options);
 	    } else {
-		foreach my $entry (@$data) {
-		    print encode($encoding, data_to_text($entry) . "\n");
+		my $kvstore = [];
+		foreach my $value (@$data) {
+		    push @$kvstore, { value => $value };
 		}
+		my $schema = { type => 'array', items => { type => 'object', properties => { value => $result_schema->{items} }}};
+		print_api_list($kvstore, $schema, ['value'], $options);
 	    }
 	} else {
 	    print encode($encoding, "$data\n");
