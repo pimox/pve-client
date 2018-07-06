@@ -83,6 +83,15 @@ if ($cmd && $cmd eq 'packagedepends') {
 my $path_properties = {};
 my $path_returns = { type => 'null' };
 
+my $api_path_property = {
+    description => "API path.",
+    type => 'string',
+    completion => sub {
+	my ($cmd, $pname, $cur, $args) = @_;
+	return PVE::APIClient::Helpers::complete_api_path($cur);
+    },
+};
+
 # dynamically update schema definition for direct API call
 # like: pveclient api <get|set|create|delete|help> <remote> <path>
 my $uri_param = {};
@@ -96,15 +105,7 @@ if (my $info = PVE::APIClient::Helpers::extract_path_info($uri_param)) {
 
 $path_properties->{format} = get_standard_option('pve-output-format'),
 $path_properties->{remote} = get_standard_option('pveclient-remote-name');
-$path_properties->{api_path} = {
-    description => "API path.",
-    type => 'string',
-    completion => sub {
-	my ($cmd, $pname, $cur, $args) = @_;
-	return PVE::APIClient::Helpers::complete_api_path($cur);
-    },
-};
-
+$path_properties->{api_path} = $api_path_property;
 
 my $format_result = sub {
     my ($data) = @_;
@@ -180,6 +181,73 @@ __PACKAGE__->register_method ({
 	return call_api_method('DELETE', $param);
     }});
 
+__PACKAGE__->register_method ({
+    name => 'pveclient_usage',
+    path => 'pveclient_usage',
+    method => 'GET',
+    description => "print API usage information for <api_path>.",
+    parameters => {
+	additionalProperties => 0,
+	properties => {
+	    api_path => $api_path_property,
+	    verbose => {
+		description => "Verbose output format.",
+		type => 'boolean',
+		optional => 1,
+	    },
+	    returns => {
+		description => "Including schema for returned data.",
+		type => 'boolean',
+		optional => 1,
+	    },
+	    command => {
+		description => "API command.",
+		type => 'string',
+		enum => [ keys %$PVE::APIClient::Helpers::method_map ],
+		optional => 1,
+	    },
+	},
+    },
+    returns => { type => 'null' },
+    code => sub {
+	my ($param) = @_;
+
+	my $path = $param->{api_path};
+
+	my $found = 0;
+	foreach my $cmd (qw(get set create delete)) {
+	    next if $param->{command} && $cmd ne $param->{command};
+	    my $method = $PVE::APIClient::Helpers::method_map->{$cmd};
+	    my $uri_param = {};
+	    my $info = PVE::APIClient::Helpers::find_method_info($path, $method, $uri_param, 1);
+	    next if !$info;
+	    $found = 1;
+
+	    my $prefix = "pveclient api $cmd <remote> $path";
+	    if ($param->{verbose}) {
+		print PVE::APIClient::RESTHandler::getopt_usage(
+		    $info, $prefix, undef, $uri_param, 'full');
+
+	    } else {
+		print "USAGE: " . PVE::APIClient::RESTHandler::getopt_usage(
+		    $info, $prefix, undef, $uri_param, 'short');
+	    }
+	    if ($param-> {returns}) {
+		my $schema = to_json($info->{returns}, {utf8 => 1, canonical => 1, pretty => 1 });
+		print "RETURNS: $schema\n";
+	    }
+	}
+
+	if (!$found) {
+	    if ($param->{command}) {
+		die "no '$param->{command}' handler for '$path'\n";
+	    } else {
+		die "no such resource '$path'\n"
+	    }
+	}
+
+	return undef;
+    }});
 
 our $cmddef = {
     config => $PVE::APIClient::Commands::config::cmddef,
@@ -195,6 +263,7 @@ our $cmddef = {
     suspend => [ 'PVE::APIClient::Commands::GuestStatus', 'suspend', ['remote', 'vmid']],
 
     api => {
+	usage => [ __PACKAGE__, 'pveclient_usage', ['api_path']],
 	get => [ __PACKAGE__, 'pveclient_get', ['remote', 'api_path'], {}, $format_result ],
 	set => [ __PACKAGE__, 'pveclient_set', ['remote', 'api_path'], {}, $format_result ],
 	create => [ __PACKAGE__, 'pveclient_create', ['remote', 'api_path'], {}, $format_result ],

@@ -20,7 +20,7 @@ my $pve_api_definition;
 
 my $pve_api_definition_fn = "/usr/share/pve-client/pve-api-definition.dat";
 
-my $method_map = {
+our $method_map = {
     create => 'POST',
     set => 'PUT',
     get => 'GET',
