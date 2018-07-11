@@ -24,16 +24,13 @@ use PVE::APIClient::Commands::GuestStatus;
 use JSON;
 
 sub call_api_method {
-    my ($method, $param) = @_;
+    my ($method, $param, $options) = @_;
 
     my $path = PVE::APIClient::Tools::extract_param($param, 'api_path');
     die "missing API path\n" if !defined($path);
 
     my $remote = PVE::APIClient::Tools::extract_param($param, 'remote');
     die "missing remote\n" if !defined($remote);
-
-    my $format = PVE::APIClient::Tools::extract_param($param, 'format');
-    PVE::APIClient::Helpers::set_output_format($format);
 
     my $config = PVE::APIClient::Config->load();
 
@@ -103,18 +100,14 @@ if (my $info = PVE::APIClient::Helpers::extract_path_info($uri_param)) {
     $path_returns = $info->{returns};
 }
 
-$path_properties->{format} = get_standard_option('pve-output-format'),
 $path_properties->{remote} = get_standard_option('pveclient-remote-name');
 $path_properties->{api_path} = $api_path_property;
 
 my $format_result = sub {
-    my ($data) = @_;
+    my ($data, $schema, $options) = @_;
 
-    my $format = PVE::APIClient::Helpers::get_output_format();
-
-    my $options = PVE::APIClient::CLIFormatter::query_terminal_options({});
-
-    PVE::APIClient::CLIFormatter::print_api_result($format, $data, $path_returns, undef, $options);
+    # NOTE; we need to use $path_returns instead of $schema
+    PVE::APIClient::CLIFormatter::print_api_result($data, $path_returns, undef, $options);
 };
 
 __PACKAGE__->register_method ({
@@ -128,9 +121,9 @@ __PACKAGE__->register_method ({
     },
     returns => $path_returns,
     code => sub {
-	my ($param) = @_;
+	my ($param, $options) = @_;
 
-	return call_api_method('GET', $param);
+	return call_api_method('GET', $param, $options);
     }});
 
 __PACKAGE__->register_method ({
@@ -144,9 +137,9 @@ __PACKAGE__->register_method ({
     },
     returns => $path_returns,
     code => sub {
-	my ($param) = @_;
+	my ($param, $options) = @_;
 
-	return call_api_method('PUT', $param);
+	return call_api_method('PUT', $param, $options);
     }});
 
 __PACKAGE__->register_method ({
@@ -160,9 +153,9 @@ __PACKAGE__->register_method ({
     },
     returns => $path_returns,
     code => sub {
-	my ($param) = @_;
+	my ($param, $options) = @_;
 
-	return call_api_method('PUSH', $param);
+	return call_api_method('PUSH', $param, $options);
     }});
 
 __PACKAGE__->register_method ({
@@ -176,9 +169,9 @@ __PACKAGE__->register_method ({
     },
     returns => $path_returns,
     code => sub {
-	my ($param) = @_;
+	my ($param, $options) = @_;
 
-	return call_api_method('DELETE', $param);
+	return call_api_method('DELETE', $param, $options);
     }});
 
 __PACKAGE__->register_method ({

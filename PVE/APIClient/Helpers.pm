@@ -27,23 +27,6 @@ our $method_map = {
     delete => 'DELETE',
 };
 
-my $default_output_format = 'text';
-my $client_output_format =  $default_output_format;
-
-sub set_output_format {
-    my ($format) = @_;
-
-    if (!defined($format)) {
-	$client_output_format =  $default_output_format;
-    } else {
-	$client_output_format =  $format;
-    }
-}
-
-sub get_output_format {
-    return $client_output_format;
-}
-
 my $__real_remove_formats; $__real_remove_formats = sub {
     my ($properties) = @_;
 
@@ -405,23 +388,12 @@ sub extract_even_elements {
     return [ grep { ($ind++ % 2) == 0 } @$list ];
 }
 
-sub print_result {
-    my ($data, $result_schema, $param_order) = @_;
-
-    my $options = {};
-    PVE::APIClient::CLIFormatter::query_terminal_options($options);
-
-    my $format = get_output_format();
-    PVE::APIClient::CLIFormatter::print_api_result(
-	$format, $data, $result_schema, $param_order, $options);
-}
-
 sub print_ordered_result {
-    my ($property_list, $data, $result_schema) = @_;
+    my ($property_list, $data, $result_schema, $options) = @_;
 
     my $param_order = extract_even_elements($property_list);
 
-    print_result($data, $result_schema, $param_order);
+    PVE::APIClient::CLIFormatter::print_api_result($data, $result_schema, $param_order, $options);
 }
 
 1;

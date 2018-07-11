@@ -30,7 +30,6 @@ __PACKAGE__->register_method ({
 	additionalProperties => 0,
 	properties => {
 	    remote => get_standard_option('pveclient-remote-name'),
-	    'format' => get_standard_option('pve-output-format'),
 	},
     },
     returns => {
@@ -43,9 +42,6 @@ __PACKAGE__->register_method ({
     code => sub {
 	my ($param) = @_;
 
-	my $format = PVE::APIClient::Tools::extract_param($param, 'format');
-	PVE::APIClient::Helpers::set_output_format($format);
-
 	my $config = PVE::APIClient::Config->load();
 	my $conn = PVE::APIClient::Config->remote_conn($config, $param->{remote});
 
@@ -54,7 +50,8 @@ __PACKAGE__->register_method ({
 
 
 our $cmddef = [ __PACKAGE__, 'list', ['remote'], {}, sub {
-    PVE::APIClient::Helpers::print_ordered_result($list_returns_properties, @_);
+    my ($data, $schema, $options) = @_;
+    PVE::APIClient::Helpers::print_ordered_result($list_returns_properties, $data, $schema, $options);
 }];
 
 1;

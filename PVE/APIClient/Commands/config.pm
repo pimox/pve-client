@@ -9,6 +9,7 @@ use PVE::APIClient::JSONSchema qw(get_standard_option);
 use PVE::APIClient::Tools qw(extract_param);
 use PVE::APIClient::Config;
 
+use PVE::APIClient::CLIFormatter;
 use PVE::APIClient::CLIHandler;
 
 use base qw(PVE::APIClient::CLIHandler);
@@ -23,6 +24,7 @@ __PACKAGE__->register_method ({
     description => "Dump default configuration.",
     parameters => {
 	additionalProperties => 0,
+	properties => {},
     },
     returns => {
 	type => 'object',
@@ -90,7 +92,13 @@ __PACKAGE__->register_method ({
 
 our $cmddef = {
     set => [ __PACKAGE__, 'set',],
-    list => [__PACKAGE__, 'list', undef, undef, sub { PVE::APIClient::Helpers::print_result(@_);}],
+    list => [__PACKAGE__, 'list', undef, undef,
+	     sub {
+		 my ($data, $schema, $options) = @_;
+
+		 PVE::APIClient::CLIFormatter::print_api_result($data, $schema, undef, $options);
+	     }
+	],
 };
 
 1;

@@ -35,9 +35,7 @@ __PACKAGE__->register_method ({
     description => "List remotes from your config file.",
     parameters => {
 	additionalProperties => 0,
-	properties => {
-	    'format' => get_standard_option('pve-output-format'),
-	},
+	properties => {},
     },
     returns => {
 	type => 'array',
@@ -48,9 +46,6 @@ __PACKAGE__->register_method ({
     },
     code => sub {
 	my ($param) = @_;
-
-	my $format = PVE::APIClient::Tools::extract_param($param, 'format');
-	PVE::APIClient::Helpers::set_output_format($format);
 
 	my $config = PVE::APIClient::Config->load();
 
@@ -212,7 +207,8 @@ our $cmddef = {
     set => [ __PACKAGE__, 'remote_set', ['name']],
     delete => [ __PACKAGE__, 'remote_delete', ['name']],
     list => [__PACKAGE__, 'remote_list', undef, {}, sub {
-	PVE::APIClient::Helpers::print_ordered_result($remote_list_returns_properties, @_);
+	my ($data, $schema, $options) = @_;
+	PVE::APIClient::Helpers::print_ordered_result($remote_list_returns_properties, $data, $schema, $options);
     }],
 };
 
