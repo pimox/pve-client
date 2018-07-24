@@ -37,7 +37,7 @@ sub api_clone_schema {
 		my ($name, $idx) = ($1, $2);
 		if ($idx == 0 && defined($d->{"${name}1"})) {
 		    $p = "${name}[n]";
-		} elsif (defined($d->{"${name}0"})) {
+		} elsif ($idx > 0 && defined($d->{"${name}0"})) {
 		    next; # only handle once for -xx0, but only if -xx0 exists
 		}
 	    }
@@ -394,7 +394,7 @@ sub find_handler {
 }
 
 sub handle {
-    my ($self, $info, $param, $output_options) = @_;
+    my ($self, $info, $param) = @_;
 
     my $func = $info->{code};
 
@@ -414,8 +414,7 @@ sub handle {
 	$param->{'extra-args'} = [map { /^(.*)$/ } @$extra] if $extra;
     }
 
-    $output_options //= {};
-    my $result = &$func($param, $output_options);
+    my $result = &$func($param);
 
     # todo: this is only to be safe - disable?
     if (my $schema = $info->{returns}) {
@@ -577,15 +576,17 @@ my $compute_param_mapping_hash = sub {
 #   'short'    ... command line only (text, one line)
 #   'full'     ... text, include description
 #   'asciidoc' ... generate asciidoc for man pages (like 'full')
-# $param_cb ... mapping for string parameters to file path parameters
+# $param_cb    ... mapping for string parameters to file path parameters
+# $formatter_properties  ... additional property definitions (passed to output formatter)
 sub getopt_usage {
-    my ($info, $prefix, $arg_param, $fixed_param, $format, $param_cb) = @_;
+    my ($info, $prefix, $arg_param, $fixed_param, $format, $param_cb, $formatter_properties) = @_;
 
     $format = 'long' if !$format;
 
     my $schema = $info->{parameters};
     my $name = $info->{name};
-    my $prop = $schema->{properties};
+    my $prop = { %{$schema->{properties}} }; # copy
+    $prop = { %$prop, %$formatter_properties } if $formatter_properties;
 
     my $out = '';
 
@@ -681,11 +682,11 @@ sub getopt_usage {
 }
 
 sub usage_str {
-    my ($self, $name, $prefix, $arg_param, $fixed_param, $format, $param_cb) = @_;
+    my ($self, $name, $prefix, $arg_param, $fixed_param, $format, $param_cb, $formatter_properties) = @_;
 
     my $info = $self->map_method_by_name($name);
 
-    return getopt_usage($info, $prefix, $arg_param, $fixed_param, $format, $param_cb);
+    return getopt_usage($info, $prefix, $arg_param, $fixed_param, $format, $param_cb, $formatter_properties);
 }
 
 # generate docs from JSON schema properties
@@ -747,7 +748,7 @@ my $replace_file_names_with_contents = sub {
 };
 
 our $standard_output_options = {
-    format => PVE::APIClient::JSONSchema::get_standard_option('pve-output-format'),
+    'output-format' => PVE::APIClient::JSONSchema::get_standard_option('pve-output-format'),
     noheader => {
 	description => "Do not show column headers (for 'text' format).",
 	type => 'boolean',
@@ -773,49 +774,72 @@ our $standard_output_options = {
     }
 };
 
-sub add_standard_output_parameters {
-    my ($org_schema) = @_;
+sub add_standard_output_properties {
+    my ($propdef, $list) = @_;
 
-    my $schema = { %$org_schema };
-    $schema->{properties} = { %{$schema->{properties}}, %$standard_output_options };
+    $propdef //= {};
 
-    return $schema;
-};
+    $list //= [ keys %$standard_output_options ];
+
+    my $res = { %$propdef }; # copy
+
+    foreach my $opt (@$list) {
+	die "no such standard output option '$opt'\n" if !defined($standard_output_options->{$opt});
+	die "detected overwriten standard CLI parameter '$opt'\n" if defined($res->{$opt});
+	$res->{$opt} = $standard_output_options->{$opt};
+    }
+
+    return $res;
+}
+
+sub extract_standard_output_properties {
+    my ($data) = @_;
+
+    my $options = {};
+    foreach my $opt (keys %$standard_output_options) {
+	$options->{$opt} = delete $data->{$opt} if defined($data->{$opt});
+    }
+
+    return $options;
+}
 
 sub cli_handler {
-    my ($self, $prefix, $name, $args, $arg_param, $fixed_param, $param_cb, $options) = @_;
+    my ($self, $prefix, $name, $args, $arg_param, $fixed_param, $param_cb, $formatter_properties) = @_;
 
     my $info = $self->map_method_by_name($name);
-    $options //= {};
-
     my $res;
+    my $fmt_param = {};
+
     eval {
 	my $param_map = {};
 	$param_map = $compute_param_mapping_hash->($param_cb->($name)) if $param_cb;
-	my $schema = add_standard_output_parameters($info->{parameters});
+	my $schema = { %{$info->{parameters}} }; # copy
+	$schema->{properties} = { %{$schema->{properties}}, %$formatter_properties } if $formatter_properties;
 	my $param = PVE::APIClient::JSONSchema::get_options($schema, $args, $arg_param, $fixed_param, $param_map);
 
-	foreach my $opt (keys %$standard_output_options) {
-	    $options->{$opt} = delete $param->{$opt} if defined($param->{$opt});
+	if ($formatter_properties) {
+	    foreach my $opt (keys %$formatter_properties) {
+		$fmt_param->{$opt} = delete $param->{$opt} if defined($param->{$opt});
+	    }
 	}
 
 	if (defined($param_map)) {
 	    $replace_file_names_with_contents->($param, $param_map);
 	}
 
-	$res = $self->handle($info, $param, $options);
+	$res = $self->handle($info, $param);
     };
     if (my $err = $@) {
 	my $ec = ref($err);
 
 	die $err if !$ec || $ec ne "PVE::APIClient::Exception" || !$err->is_param_exc();
 	
-	$err->{usage} = $self->usage_str($name, $prefix, $arg_param, $fixed_param, 'short',  $param_cb);
+	$err->{usage} = $self->usage_str($name, $prefix, $arg_param, $fixed_param, 'short', $param_cb, $formatter_properties);
 
 	die $err;
     }
 
-    return $res;
+    return wantarray ? ($res, $fmt_param) : $res;
 }
 
 # utility methods
