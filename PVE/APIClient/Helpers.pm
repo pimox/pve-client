@@ -203,19 +203,18 @@ sub complete_api_path {
 	if (my $children = $info->{children}) {
 	    foreach my $c (@$children) {
 		my $ctext = $c->{text};
+		push @$res, "${prefix}$ctext" if $ctext =~ m/^\Q$rest/;
 		if ($ctext =~ m/^\{(\S+)\}$/) {
-		    push @$res, "$prefix$ctext";
-		    push @$res, "$prefix$ctext/";
-		    if (length($rest)) {
+		    if (length($rest) && $rest ne $ctext) {
 			push @$res, "$prefix$rest";
-			push @$res, "$prefix$rest/";
 		    }
-		} elsif ($ctext =~ m/^\Q$rest/) {
-		    push @$res, "$prefix$ctext";
-		    push @$res, "$prefix$ctext/" if $c->{children};
 		}
 	    }
 	}
+    }
+
+    if (scalar(@$res) == 1) {
+	$res = [$res->[0], "$res->[0]/"];
     }
 
     return $res;
