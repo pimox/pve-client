@@ -23,7 +23,7 @@ sub remove_code_refs {
 		if ($itemclass eq 'CODE') {
 		    undef $tree->{$k};
 		} elsif ($itemclass eq 'Regexp') {
-		    $tree->{$k} = "$tree"; # return string representation
+		    $tree->{$k} = "$tree->{$k}"; # return string representation
 		} else {
 		    remove_code_refs($tree->{$k});
 		}
