@@ -392,6 +392,7 @@ sub print_ordered_result {
 
     my $param_order = extract_even_elements($property_list);
 
+    PVE::APIClient::CLIFormatter::query_terminal_options($options);
     PVE::APIClient::CLIFormatter::print_api_result($data, $result_schema, $param_order, $options);
 }
 

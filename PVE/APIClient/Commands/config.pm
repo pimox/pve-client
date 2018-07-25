@@ -10,6 +10,7 @@ use PVE::APIClient::Tools qw(extract_param);
 use PVE::APIClient::Config;
 
 use PVE::APIClient::CLIFormatter;
+use PVE::APIClient::RESTHandler;
 use PVE::APIClient::CLIHandler;
 
 use base qw(PVE::APIClient::CLIHandler);
@@ -96,8 +97,10 @@ our $cmddef = {
 	     sub {
 		 my ($data, $schema, $options) = @_;
 
+		 PVE::APIClient::CLIFormatter::query_terminal_options($options);
 		 PVE::APIClient::CLIFormatter::print_api_result($data, $schema, undef, $options);
-	     }
+	     },
+	     $PVE::APIClient::RESTHandler::standard_output_options,
 	],
 };
 

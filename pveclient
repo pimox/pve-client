@@ -8,6 +8,7 @@ use Cwd 'abs_path';
 use Data::Dumper;
 
 use PVE::APIClient::JSONSchema qw(register_standard_option get_standard_option);
+use PVE::APIClient::RESTHandler;
 use PVE::APIClient::CLIFormatter;
 use PVE::APIClient::CLIHandler;
 use PVE::APIClient::PTY;
@@ -24,10 +25,13 @@ use PVE::APIClient::Commands::GuestStatus;
 use JSON;
 
 sub call_api_method {
-    my ($method, $param, $options) = @_;
+    my ($method, $param) = @_;
 
     my $path = PVE::APIClient::Tools::extract_param($param, 'api_path');
     die "missing API path\n" if !defined($path);
+
+    my $stdopts = PVE::APIClient::RESTHandler::extract_standard_output_properties($param);
+    PVE::APIClient::CLIFormatter::query_terminal_options($stdopts);
 
     my $remote = PVE::APIClient::Tools::extract_param($param, 'remote');
     die "missing remote\n" if !defined($remote);
@@ -43,7 +47,9 @@ sub call_api_method {
     die "undefined result" if !defined($res);
     die "undefined result data" if !exists($res->{data});
 
-    return $res->{data};
+    my $data = $res->{data};
+
+    PVE::APIClient::CLIFormatter::print_api_result($data, $info->{returns}, undef, $stdopts);
 }
 
 use base qw(PVE::APIClient::CLIHandler);
@@ -78,7 +84,6 @@ if ($cmd && $cmd eq 'packagedepends') {
 }
 
 my $path_properties = {};
-my $path_returns = { type => 'null' };
 
 my $api_path_property = {
     description => "API path.",
@@ -97,18 +102,10 @@ if (my $info = PVE::APIClient::Helpers::extract_path_info($uri_param)) {
 	next if defined($uri_param->{$key});
 	$path_properties->{$key} = $info->{parameters}->{properties}->{$key};
     }
-    $path_returns = $info->{returns};
 }
 
 $path_properties->{remote} = get_standard_option('pveclient-remote-name');
 $path_properties->{api_path} = $api_path_property;
-
-my $format_result = sub {
-    my ($data, $schema, $options) = @_;
-
-    # NOTE; we need to use $path_returns instead of $schema
-    PVE::APIClient::CLIFormatter::print_api_result($data, $path_returns, undef, $options);
-};
 
 __PACKAGE__->register_method ({
     name => 'pveclient_get',
@@ -117,13 +114,15 @@ __PACKAGE__->register_method ({
     description => "Call API GET on <api_path>.",
     parameters => {
 	additionalProperties => 0,
-	properties => $path_properties,
+	properties => PVE::APIClient::RESTHandler::add_standard_output_properties($path_properties),
     },
-    returns => $path_returns,
+    returns => { type => 'null' },
     code => sub {
-	my ($param, $options) = @_;
+	my ($param) = @_;
 
-	return call_api_method('GET', $param, $options);
+	call_api_method('GET', $param);
+
+	return undef;
     }});
 
 __PACKAGE__->register_method ({
@@ -133,13 +132,15 @@ __PACKAGE__->register_method ({
     description => "Call API PUT on <api_path>.",
     parameters => {
 	additionalProperties => 0,
-	properties => $path_properties,
+	properties => PVE::APIClient::RESTHandler::add_standard_output_properties($path_properties),
     },
-    returns => $path_returns,
+    returns => { type => 'null' },
     code => sub {
-	my ($param, $options) = @_;
+	my ($param) = @_;
 
-	return call_api_method('PUT', $param, $options);
+	call_api_method('PUT', $param);
+
+	return undef;
     }});
 
 __PACKAGE__->register_method ({
@@ -149,13 +150,15 @@ __PACKAGE__->register_method ({
     description => "Call API POST on <api_path>.",
     parameters => {
 	additionalProperties => 0,
-	properties => $path_properties,
+	properties => PVE::APIClient::RESTHandler::add_standard_output_properties($path_properties),
     },
-    returns => $path_returns,
+    returns => { type => 'null' },
     code => sub {
-	my ($param, $options) = @_;
+	my ($param) = @_;
 
-	return call_api_method('PUSH', $param, $options);
+	call_api_method('PUSH', $param);
+
+	return undef;
     }});
 
 __PACKAGE__->register_method ({
@@ -165,13 +168,15 @@ __PACKAGE__->register_method ({
     description => "Call API DELETE on <api_path>.",
     parameters => {
 	additionalProperties => 0,
-	properties => $path_properties,
+	properties => PVE::APIClient::RESTHandler::add_standard_output_properties($path_properties),
     },
-    returns => $path_returns,
+    returns => { type => 'null' },
     code => sub {
-	my ($param, $options) = @_;
+	my ($param) = @_;
 
-	return call_api_method('DELETE', $param, $options);
+	call_api_method('DELETE', $param);
+
+	return undef;
     }});
 
 __PACKAGE__->register_method ({
@@ -257,10 +262,10 @@ our $cmddef = {
 
     api => {
 	usage => [ __PACKAGE__, 'pveclient_usage', ['api_path']],
-	get => [ __PACKAGE__, 'pveclient_get', ['remote', 'api_path'], {}, $format_result ],
-	set => [ __PACKAGE__, 'pveclient_set', ['remote', 'api_path'], {}, $format_result ],
-	create => [ __PACKAGE__, 'pveclient_create', ['remote', 'api_path'], {}, $format_result ],
-	delete => [ __PACKAGE__, 'pveclient_delete', ['remote', 'api_path'], {}, $format_result ],
+	get => [ __PACKAGE__, 'pveclient_get', ['remote', 'api_path']],
+	set => [ __PACKAGE__, 'pveclient_set', ['remote', 'api_path']],
+	create => [ __PACKAGE__, 'pveclient_create', ['remote', 'api_path']],
+	delete => [ __PACKAGE__, 'pveclient_delete', ['remote', 'api_path']],
     },
 };
 

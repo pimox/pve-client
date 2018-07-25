@@ -206,10 +206,13 @@ our $cmddef = {
     add => [ __PACKAGE__, 'remote_add', ['name', 'host', 'username']],
     set => [ __PACKAGE__, 'remote_set', ['name']],
     delete => [ __PACKAGE__, 'remote_delete', ['name']],
-    list => [__PACKAGE__, 'remote_list', undef, {}, sub {
-	my ($data, $schema, $options) = @_;
-	PVE::APIClient::Helpers::print_ordered_result($remote_list_returns_properties, $data, $schema, $options);
-    }],
+    list => [__PACKAGE__, 'remote_list', undef, {},
+	     sub {
+		 my ($data, $schema, $options) = @_;
+		 PVE::APIClient::Helpers::print_ordered_result($remote_list_returns_properties, $data, $schema, $options);
+	     },
+	     $PVE::APIClient::RESTHandler::standard_output_options,
+	],
 };
 
 1;

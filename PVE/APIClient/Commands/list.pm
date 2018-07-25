@@ -25,7 +25,7 @@ __PACKAGE__->register_method ({
     name => 'list',
     path => 'list',
     method => 'GET',
-    description => "List containers.",
+    description => "List VMs and Containers.",
     parameters => {
 	additionalProperties => 0,
 	properties => {
@@ -49,9 +49,12 @@ __PACKAGE__->register_method ({
     }});
 
 
-our $cmddef = [ __PACKAGE__, 'list', ['remote'], {}, sub {
-    my ($data, $schema, $options) = @_;
-    PVE::APIClient::Helpers::print_ordered_result($list_returns_properties, $data, $schema, $options);
-}];
+our $cmddef = [ __PACKAGE__, 'list', ['remote'], {},
+		sub {
+		    my ($data, $schema, $options) = @_;
+		    PVE::APIClient::Helpers::print_ordered_result($list_returns_properties, $data, $schema, $options);
+		},
+		$PVE::APIClient::RESTHandler::standard_output_options,
+    ];
 
 1;
