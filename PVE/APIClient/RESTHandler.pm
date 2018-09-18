@@ -17,8 +17,35 @@ my $method_path_lookup = {};
 
 our $AUTOLOAD;  # it's a package global
 
+our $standard_output_options = {
+    'output-format' => PVE::APIClient::JSONSchema::get_standard_option('pve-output-format'),
+    noheader => {
+	description => "Do not show column headers (for 'text' format).",
+	type => 'boolean',
+	optional => 1,
+	default => 1,
+    },
+    noborder => {
+	description => "Do not draw borders (for 'text' format).",
+	type => 'boolean',
+	optional => 1,
+	default => 1,
+    },
+    quiet => {
+        description => "Suppress printing results.",
+        type => 'boolean',
+        optional => 1,
+    },
+    'human-readable' => {
+        description => "Call output rendering functions to produce human readable text.",
+        type => 'boolean',
+        optional => 1,
+	default => 1,
+    }
+};
+
 sub api_clone_schema {
-    my ($schema) = @_;
+    my ($schema, $no_typetext) = @_;
 
     my $res = {};
     my $ref = ref($schema);
@@ -44,7 +71,7 @@ sub api_clone_schema {
 	    my $tmp = ref($pd) ? clone($pd) : $pd;
 	    # NOTE: add typetext property for more complex types, to
 	    # make the web api viewer code simpler
-	    if (!(defined($tmp->{enum}) || defined($tmp->{pattern}))) {
+	    if (!$no_typetext && !(defined($tmp->{enum}) || defined($tmp->{pattern}))) {
 		my $typetext = PVE::APIClient::JSONSchema::schema_get_type_text($tmp);
 		if ($tmp->{type} && ($tmp->{type} ne $typetext)) {
 		    $tmp->{typetext} = $typetext;
@@ -116,6 +143,8 @@ sub api_dump_full {
 		    } else {
 			if ($k eq 'parameters') {
 			    $data->{$k} = api_clone_schema($d);
+			} elsif ($k eq 'returns') {
+			    $data->{$k} = api_clone_schema($d, 1);
 			} else {
 			    $data->{$k} = ref($d) ? clone($d) : $d;
 			}
@@ -586,7 +615,26 @@ sub getopt_usage {
     my $schema = $info->{parameters};
     my $name = $info->{name};
     my $prop = { %{$schema->{properties}} }; # copy
-    $prop = { %$prop, %$formatter_properties } if $formatter_properties;
+
+    my $has_output_format_option = $formatter_properties->{'output-format'} ? 1 : 0;
+
+    if ($formatter_properties) {
+	foreach my $key (keys %$formatter_properties) {
+	    if (!$standard_output_options->{$key}) {
+		$prop->{$key} = $formatter_properties->{$key};
+	    }
+	}
+    }
+
+    # also remove $standard_output_options from $prop (pvesh, pveclient)
+    if ($prop->{'output-format'}) {
+	$has_output_format_option = 1;
+	foreach my $key (keys %$prop) {
+	    if ($standard_output_options->{$key}) {
+		delete $prop->{$key};
+	    }
+	}
+    }
 
     my $out = '';
 
@@ -655,11 +703,15 @@ sub getopt_usage {
     if ($format eq 'asciidoc') {
 	$out .= "*${prefix}*";
 	$out .= " `$args`" if $args;
-	$out .= $opts ? " `[OPTIONS]`\n" : "\n";
+	$out .= " `[OPTIONS]`" if $opts;
+	$out .= " `[FORMAT_OPTIONS]`" if $has_output_format_option;
+	$out .= "\n";
     } else {
 	$out .= "USAGE: " if $format ne 'short';
 	$out .= "$prefix $args";
-	$out .= $opts ? " [OPTIONS]\n" : "\n";
+	$out .= " [OPTIONS]" if $opts;
+	$out .= " [FORMAT_OPTIONS]" if $has_output_format_option;
+	$out .= "\n";
     }
 
     return $out if $format eq 'short';
@@ -745,33 +797,6 @@ my $replace_file_names_with_contents = sub {
     }
 
     return $param;
-};
-
-our $standard_output_options = {
-    'output-format' => PVE::APIClient::JSONSchema::get_standard_option('pve-output-format'),
-    noheader => {
-	description => "Do not show column headers (for 'text' format).",
-	type => 'boolean',
-	optional => 1,
-	default => 1,
-    },
-    noborder => {
-	description => "Do not draw borders (for 'text' format).",
-	type => 'boolean',
-	optional => 1,
-	default => 1,
-    },
-    quiet => {
-        description => "Suppress printing results.",
-        type => 'boolean',
-        optional => 1,
-    },
-    'human-readable' => {
-        description => "Call output rendering functions to produce human readable text.",
-        type => 'boolean',
-        optional => 1,
-	default => 1,
-    }
 };
 
 sub add_standard_output_properties {

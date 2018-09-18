@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use I18N::Langinfo;
 use POSIX qw(strftime);
+use CPAN::Meta::YAML; # comes with perl-modules
 
 use PVE::APIClient::JSONSchema;
 use PVE::APIClient::PTY;
@@ -75,11 +76,22 @@ sub render_bytes {
         $max_unit = int(log($value)/log(1024));
         $value /= 1024**($max_unit);
     }
-
-    return sprintf "%.2f $units[$max_unit]", $value;
+    my $unit = $units[$max_unit];
+    return sprintf "%.2f $unit", $value;
 }
 
 PVE::APIClient::JSONSchema::register_renderer('bytes', \&render_bytes);
+
+sub render_yaml {
+    my ($value) = @_;
+
+    my $data = CPAN::Meta::YAML::Dump($value);
+    $data =~ s/^---[\n\s]//; # remove yaml marker
+
+    return $data;
+}
+
+PVE::APIClient::JSONSchema::register_renderer('yaml', \&render_yaml);
 
 sub query_terminal_options {
     my ($options) = @_;
@@ -98,9 +110,11 @@ sub query_terminal_options {
 }
 
 sub data_to_text {
-    my ($data, $propdef, $options) = @_;
+    my ($data, $propdef, $options, $terminal_opts) = @_;
 
     return '' if !defined($data);
+
+    $terminal_opts //= {};
 
     my $human_readable = $options->{'human-readable'} // 1;
 
@@ -116,12 +130,13 @@ sub data_to_text {
 	if (defined(my $renderer = $propdef->{renderer})) {
 	    my $code = PVE::APIClient::JSONSchema::get_renderer($renderer);
 	    die "internal error: unknown renderer '$renderer'" if !$code;
-	    return $code->($data, $options);
+	    return $code->($data, $options, $terminal_opts);
 	}
     }
 
     if (my $class = ref($data)) {
-	return to_json($data, { canonical => 1 });
+	# JSON::PP::Boolean requires allow_nonref
+	return to_json($data, { allow_nonref => 1, canonical => 1 });
     } else {
 	return "$data";
     }
@@ -132,7 +147,7 @@ sub data_to_text {
 # $returnprops -json schema property description
 # $props_to_print - ordered list of properties to print
 # $options
-# - sort_key: can be used to sort after a column, if it isn't set we sort
+# - sort_key: can be used to sort after a specific column, if it isn't set we sort
 #   after the leftmost column (with no undef value in $data) this can be
 #   turned off by passing 0 as sort_key
 # - noborder: print without asciiart border
@@ -141,20 +156,21 @@ sub data_to_text {
 # - utf8: use utf8 characters for table delimiters
 
 sub print_text_table {
-    my ($data, $returnprops, $props_to_print, $options) = @_;
+    my ($data, $returnprops, $props_to_print, $options, $terminal_opts) = @_;
+
+    $terminal_opts //= query_terminal_options({});
 
     my $sort_key = $options->{sort_key};
     my $border = !$options->{noborder};
     my $header = !$options->{noheader};
-    my $columns = $options->{columns};
-    my $utf8 = $options->{utf8};
-    my $encoding = $options->{encoding} // 'UTF-8';
 
-    if (!defined($sort_key) || $sort_key eq 0) {
-	$sort_key = $props_to_print->[0];
-    }
+    my $columns = $terminal_opts->{columns};
+    my $utf8 = $terminal_opts->{utf8};
+    my $encoding = $terminal_opts->{encoding} // 'UTF-8';
 
-    if (defined($sort_key)) {
+    $sort_key //= $props_to_print->[0];
+
+    if (defined($sort_key) && $sort_key ne 0) {
 	my $type = $returnprops->{$sort_key}->{type} // 'string';
 	if ($type eq 'integer' || $type eq 'number') {
 	    @$data = sort { $a->{$sort_key} <=> $b->{$sort_key} } @$data;
@@ -183,7 +199,7 @@ sub print_text_table {
 	    my $prop = $props_to_print->[$i];
 	    my $propinfo = $returnprops->{$prop} // {};
 
-	    my $text = data_to_text($entry->{$prop}, $propinfo, $options);
+	    my $text = data_to_text($entry->{$prop}, $propinfo, $options, $terminal_opts);
 	    my $lines = [ split(/\n/, $text) ];
 	    my $linecount = scalar(@$lines);
 	    $height = $linecount if $linecount > $height;
@@ -193,6 +209,8 @@ sub print_text_table {
 		my $len = length($line);
 		$width = $len if $len > $width;
 	    }
+
+	    $width = ($width =~ m/^(\d+)$/) ? int($1) : 0; # untaint int
 
 	    $rowdata->{$prop} = {
 		lines => $lines,
@@ -209,6 +227,8 @@ sub print_text_table {
     for (my $i = 0; $i < $column_count; $i++) {
 	my $prop = $props_to_print->[$i];
 	my $propinfo = $returnprops->{$prop} // {};
+	my $type = $propinfo->{type} // 'string';
+	my $alignstr = ($type eq 'integer' || $type eq 'number') ? '' : '-';
 
 	my $title = $propinfo->{title} // $prop;
 	my $cutoff = $propinfo->{print_width} // $propinfo->{maxLength};
@@ -231,48 +251,48 @@ sub print_text_table {
 	if ($border) {
 	    if ($i == 0 && ($column_count == 1)) {
 		if ($utf8) {
-		    $formatstring .= "│ %-${cutoff}s │";
+		    $formatstring .= "│ %$alignstr${cutoff}s │";
 		    $borderstring_t .= "┌─" . ('─' x $cutoff) . "─┐";
 		    $borderstring_m .= "├─" . ('─' x $cutoff) . "─┤";
 		    $borderstring_b .= "└─" . ('─' x $cutoff) . "─┘";
 		} else {
-		    $formatstring .= "| %-${cutoff}s |";
+		    $formatstring .= "| %$alignstr${cutoff}s |";
 		    $borderstring_m .= "+-" . ('-' x $cutoff) . "-+";
 		}
 	    } elsif ($i == 0) {
 		if ($utf8) {
-		    $formatstring .= "│ %-${cutoff}s ";
+		    $formatstring .= "│ %$alignstr${cutoff}s ";
 		    $borderstring_t .= "┌─" . ('─' x $cutoff) . '─';
 		    $borderstring_m .= "├─" . ('─' x $cutoff) . '─';
 		    $borderstring_b .= "└─" . ('─' x $cutoff) . '─';
 		} else {
-		    $formatstring .= "| %-${cutoff}s ";
+		    $formatstring .= "| %$alignstr${cutoff}s ";
 		    $borderstring_m .= "+-" . ('-' x $cutoff) . '-';
 		}
 	    } elsif ($i == ($column_count - 1)) {
 		if ($utf8) {
-		    $formatstring .= "│ %-${cutoff}s │";
+		    $formatstring .= "│ %$alignstr${cutoff}s │";
 		    $borderstring_t .= "┬─" . ('─' x $cutoff) . "─┐";
 		    $borderstring_m .= "┼─" . ('─' x $cutoff) . "─┤";
 		    $borderstring_b .= "┴─" . ('─' x $cutoff) . "─┘";
 		} else {
-		    $formatstring .= "| %-${cutoff}s |";
+		    $formatstring .= "| %$alignstr${cutoff}s |";
 		    $borderstring_m .= "+-" . ('-' x $cutoff) . "-+";
 		}
 	    } else {
 		if ($utf8) {
-		    $formatstring .= "│ %-${cutoff}s ";
+		    $formatstring .= "│ %$alignstr${cutoff}s ";
 		    $borderstring_t .= "┬─" . ('─' x $cutoff) . '─';
 		    $borderstring_m .= "┼─" . ('─' x $cutoff) . '─';
 		    $borderstring_b .= "┴─" . ('─' x $cutoff) . '─';
 		} else {
-		    $formatstring .= "| %-${cutoff}s ";
+		    $formatstring .= "| %$alignstr${cutoff}s ";
 		    $borderstring_m .= "+-" . ('-' x $cutoff) . '-';
 		}
 	    }
 	} else {
 	    # skip alignment and cutoff on last column
-	    $formatstring .= ($i == ($column_count - 1)) ? "%s" : "%-${cutoff}s ";
+	    $formatstring .= ($i == ($column_count - 1)) ? "%s" : "%$alignstr${cutoff}s ";
 	}
     }
 
@@ -338,7 +358,7 @@ sub extract_properties_to_print {
 # takes all fields of the results property, with a fallback
 # to all fields occuring in items of $data.
 sub print_api_list {
-    my ($data, $result_schema, $props_to_print, $options) = @_;
+    my ($data, $result_schema, $props_to_print, $options, $terminal_opts) = @_;
 
     die "can only print object lists\n"
 	if !($result_schema->{type} eq 'array' && $result_schema->{items}->{type} eq 'object');
@@ -360,25 +380,46 @@ sub print_api_list {
 
     die "unable to detect list properties\n" if !scalar(@$props_to_print);
 
-    print_text_table($data, $returnprops, $props_to_print, $options);
+    print_text_table($data, $returnprops, $props_to_print, $options, $terminal_opts);
 }
 
+my $guess_type = sub {
+    my $data = shift;
+
+    return 'null' if !defined($data);
+
+    my $class = ref($data);
+    return 'string' if !$class;
+
+    if ($class eq 'HASH') {
+	return 'object';
+    } elsif ($class eq 'ARRAY') {
+	return 'array';
+    } else {
+	return 'string'; # better than nothing
+    }
+};
+
 sub print_api_result {
-    my ($data, $result_schema, $props_to_print, $options) = @_;
+    my ($data, $result_schema, $props_to_print, $options, $terminal_opts) = @_;
 
     return if $options->{quiet};
 
-    if (!defined($options)) {
-	$options = query_terminal_options({});
-    } else {
-	$options = { %$options }; # copy
-    }
+    $terminal_opts //= query_terminal_options({});
 
     my $format = $options->{'output-format'} // 'text';
 
-    return if $result_schema->{type} eq 'null';
+    if ($result_schema && defined($result_schema->{type})) {
+	return if $result_schema->{type} eq 'null';
+    } else {
+	my $type = $guess_type->($data);
+	$result_schema = { type => $type };
+	$result_schema->{items} = { type => $guess_type->($data->[0]) } if $type eq 'array';
+    }
 
-    if ($format eq 'json') {
+    if ($format eq 'yaml') {
+	print encode('UTF-8', CPAN::Meta::YAML::Dump($data));
+    } elsif ($format eq 'json') {
 	# Note: we always use utf8 encoding for json format
 	print to_json($data, {utf8 => 1, allow_nonref => 1, canonical => 1 }) . "\n";
     } elsif ($format eq 'json-pretty') {
@@ -394,23 +435,22 @@ sub print_api_result {
 	    my $kvstore = [];
 	    foreach my $key (@$props_to_print) {
 		next if !defined($data->{$key});
-		push @$kvstore, { key => $key, value => data_to_text($data->{$key}, $result_schema->{properties}->{$key}, $options) };
+		push @$kvstore, { key => $key, value => data_to_text($data->{$key}, $result_schema->{properties}->{$key}, $options, $terminal_opts) };
 	    }
 	    my $schema = { type => 'array', items => { type => 'object' }};
-	    print_api_list($kvstore, $schema, ['key', 'value'], $options);
+	    print_api_list($kvstore, $schema, ['key', 'value'], $options, $terminal_opts);
 	} elsif ($type eq 'array') {
 	    return if !scalar(@$data);
 	    my $item_type = $result_schema->{items}->{type};
 	    if ($item_type eq 'object') {
-		print_api_list($data, $result_schema, $props_to_print, $options);
+		print_api_list($data, $result_schema, $props_to_print, $options, $terminal_opts);
 	    } else {
 		my $kvstore = [];
 		foreach my $value (@$data) {
 		    push @$kvstore, { value => $value };
 		}
 		my $schema = { type => 'array', items => { type => 'object', properties => { value => $result_schema->{items} }}};
-		$options->{noheader} = 1;
-		print_api_list($kvstore, $schema, ['value'], $options);
+		print_api_list($kvstore, $schema, ['value'], { %$options, noheader => 1 },  $terminal_opts);
 	    }
 	} else {
 	    print encode($encoding, "$data\n");
@@ -418,6 +458,18 @@ sub print_api_result {
     } else {
 	die "internal error: unknown output format"; # should not happen
     }
+}
+
+sub print_api_result_plain {
+    my ($data, $result_schema, $props_to_print, $options) = @_;
+
+    # avoid borders and header, ignore terminal width
+    $options = $options ? { %$options } : {}; # copy
+
+    $options->{noheader} //= 1;
+    $options->{noborder} //= 1;
+
+    print_api_result($data, $result_schema, $props_to_print, $options, {});
 }
 
 1;
