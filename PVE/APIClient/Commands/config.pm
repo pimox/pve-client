@@ -97,7 +97,6 @@ our $cmddef = {
 	     sub {
 		 my ($data, $schema, $options) = @_;
 
-		 PVE::APIClient::CLIFormatter::query_terminal_options($options);
 		 PVE::APIClient::CLIFormatter::print_api_result($data, $schema, undef, $options);
 	     },
 	     $PVE::APIClient::RESTHandler::standard_output_options,
